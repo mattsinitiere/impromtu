@@ -89,12 +89,6 @@ The wordmark and headings are Inter; the dial, labels and counters are JetBrains
 
 If you'd rather not depend on that — for privacy, or for offline use — delete the three `<link>` tags in `<head>`. The stack falls back to SF Pro on macOS and Segoe UI Variable on Windows, which is a small visual change, not a broken one. To self-host instead, drop the woff2 files in a `fonts/` folder and add `@font-face` rules at the top of the `<style>` block.
 
-## Known limits
-
-- **No presentation scoring.** The original spec listed it as a future feature and it stays future. Scoring a spoken minute properly needs audio capture and a model call, which means a backend and a privacy story this version deliberately doesn't have.
-- **No spin-wheel mode.** The dial already carries the drawing animation; a second randomiser would compete with it.
-- **Single file by design.** At ~65 KB it loads in one request. If it grows past a few hundred KB, split the corpus into its own `topics.js` before splitting anything else.
-
 ## Licence
 
 MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Matthew Sinitiere.
