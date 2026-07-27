@@ -1,0 +1,92 @@
+/* Impromptu — shared stylesheet for the standalone pages.
+   The app itself (index.html) is self-contained; this covers mission,
+   privacy, terms and contact only. */
+:root{
+  --paper:#FBFBFD; --paper-2:#F4F4F7; --surface:#FFFFFF;
+  --ink:#131318; --ink-2:#3D3D48; --muted:#70707E; --faint:#A0A0AE;
+  --line:rgba(19,19,24,.09); --line-strong:rgba(19,19,24,.16);
+  --accent:#4F46E5; --accent-soft:rgba(79,70,229,.09); --accent-ring:rgba(79,70,229,.28);
+  --glass:rgba(255,255,255,.72);
+  --sans:"Inter",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.22,.9,.28,1);
+}
+[data-theme="dark"]{
+  --paper:#0A0A0D; --paper-2:#111116; --surface:#141419;
+  --ink:#F3F3F6; --ink-2:#C9C9D3; --muted:#9695A4; --faint:#6C6B7A;
+  --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.17);
+  --accent:#8281F7; --accent-soft:rgba(130,129,247,.13); --accent-ring:rgba(130,129,247,.34);
+  --glass:rgba(20,20,25,.72);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  transition:background-color .5s var(--ease), color .5s var(--ease);
+}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:6px}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+
+.hdr{
+  position:sticky; top:0; z-index:20; background:var(--glass);
+  backdrop-filter:blur(16px) saturate(180%); -webkit-backdrop-filter:blur(16px) saturate(180%);
+  border-bottom:1px solid var(--line);
+}
+.hdr-in{display:flex; align-items:center; gap:18px; height:64px; max-width:1120px; margin:0 auto; padding:0 24px}
+.brand{font-weight:700; font-size:18px; letter-spacing:-.045em; text-decoration:none; color:var(--ink); transition:opacity .2s var(--ease)}
+.brand:hover{opacity:.62}
+.back{
+  margin-left:auto; display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 13px;
+  border:1px solid var(--line); border-radius:10px; font-size:13.5px; color:var(--muted);
+  text-decoration:none; background:var(--surface); transition:all .2s var(--ease);
+}
+.back:hover{color:var(--ink); border-color:var(--line-strong)}
+.back svg{width:14px; height:14px}
+.tog{
+  width:34px; height:34px; display:grid; place-items:center; border-radius:10px; cursor:pointer;
+  border:1px solid transparent; background:transparent; color:var(--muted); transition:all .2s var(--ease);
+}
+.tog:hover{background:var(--paper-2); color:var(--ink); border-color:var(--line)}
+.tog svg{width:17px; height:17px}
+[data-theme="light"] .moon{display:none}
+[data-theme="dark"] .sun{display:none}
+
+.doc{padding:64px 0 40px}
+.eyebrow{font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint); margin:0}
+.doc h1{font-size:clamp(32px,5vw,46px); letter-spacing:-.035em; line-height:1.05; margin:16px 0 0; font-weight:600}
+.lede{font-size:18px; color:var(--muted); margin:18px 0 0; line-height:1.6; text-wrap:pretty}
+.stamp{font-family:var(--mono); font-size:11px; color:var(--faint); margin:26px 0 0; padding-top:20px; border-top:1px solid var(--line)}
+.doc h2{font-size:20px; letter-spacing:-.022em; margin:44px 0 0; font-weight:600}
+.doc h3{font-size:15.5px; letter-spacing:-.015em; margin:28px 0 0; font-weight:600}
+.doc p{margin:14px 0 0; color:var(--ink-2); line-height:1.72; text-wrap:pretty}
+.doc ul{margin:14px 0 0; padding-left:20px; color:var(--ink-2)}
+.doc li{margin:8px 0; line-height:1.68}
+.doc strong{color:var(--ink); font-weight:600}
+.doc a{color:var(--accent); text-decoration:none; border-bottom:1px solid var(--accent-ring)}
+.doc a:hover{border-bottom-color:var(--accent)}
+.doc code{font-family:var(--mono); font-size:.88em; background:var(--paper-2); padding:2px 6px; border-radius:6px; border:1px solid var(--line)}
+.callout{
+  margin:26px 0 0; padding:16px 18px; border-radius:14px;
+  background:var(--accent-soft); border:1px solid var(--accent-ring);
+}
+.callout p{margin:0; color:var(--ink-2); font-size:14.5px}
+.callout p + p{margin-top:10px}
+.plain{margin:26px 0 0; padding:16px 18px; border-radius:14px; background:var(--paper-2); border:1px solid var(--line)}
+.plain p{margin:0; font-size:14.5px}
+.rows{margin:20px 0 0; border-top:1px solid var(--line)}
+.rows div{display:flex; gap:16px; padding:13px 2px; border-bottom:1px solid var(--line); font-size:14.5px; color:var(--ink-2); flex-wrap:wrap}
+.rows b{font-weight:500; color:var(--ink); min-width:190px}
+
+.ftr{margin-top:80px; border-top:1px solid var(--line); padding:30px 0 46px}
+.ftr-in{display:flex; gap:20px; align-items:center; flex-wrap:wrap; max-width:1120px; margin:0 auto; padding:0 24px}
+.ver{font-family:var(--mono); font-size:11px; color:var(--faint)}
+.ftr-links{display:flex; gap:20px; flex-wrap:wrap; margin-left:auto}
+.ftr-links a{font-size:13.5px; color:var(--muted); text-decoration:none; transition:color .2s}
+.ftr-links a:hover{color:var(--ink)}
+@media (max-width:600px){
+  .doc{padding:44px 0 30px}
+  .rows b{min-width:0; width:100%}
+  .ftr-links{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
