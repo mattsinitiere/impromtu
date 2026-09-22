@@ -1,35 +1,37 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
-import { looksLikeKey, GRADING_MODELS, DEFAULT_MODEL } from "@/lib/openai";
 import { downloadJSON } from "@/lib/utils";
+import { describePlan, PRICE_LABEL, TRIAL_DAYS, DAILY_CAP } from "@/lib/entitlement";
 
 export default function SettingsPanel() {
-  const { S, setTheme, user, profile, hasAccounts, saveApiKey, updateDisplayName, updateProfile, updatePassword, exportData, deleteAccount, logout, toast, ready } = useStore();
-  const [pw, setPw] = useState("");
-  const model = profile?.grading_model || DEFAULT_MODEL;
+  const { S, setTheme, user, profile, plan, refreshPlan, hasAccounts, updateDisplayName, updatePassword, exportData, deleteAccount, logout, startCheckout, openPortal, toast, ready } = useStore();
   const router = useRouter();
-  const [key, setKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  const params = useSearchParams();
   const [name, setName] = useState("");
+  const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState("");
-  const [msg, setMsg] = useState({ key: "", name: "", del: "" });
+  const [msg, setMsg] = useState({ name: "", del: "" });
 
-  useEffect(() => { if (profile) { setKey(profile.openai_api_key || ""); setName(profile.display_name || ""); } }, [profile]);
+  useEffect(() => { if (profile) setName(profile.display_name || ""); }, [profile]);
 
-  async function saveKey(e) {
-    e.preventDefault();
-    const k = key.trim();
-    if (k && !looksLikeKey(k)) { setMsg({ ...msg, key: "That doesn't look like an OpenAI key (they start with sk-)." }); return; }
-    setBusy("key");
-    try { await saveApiKey(k); setMsg({ ...msg, key: "" }); toast(k ? "API key saved." : "API key removed."); }
-    catch (ex) { setMsg({ ...msg, key: ex.message }); }
-    finally { setBusy(""); }
-  }
+  /* back from Stripe Checkout: the webhook may land a few seconds after we do */
+  const checkout = params.get("checkout");
+  useEffect(() => {
+    if (!user || !checkout) return;
+    if (checkout === "cancel") { toast("Checkout cancelled. Nothing was charged."); router.replace("/settings"); return; }
+    toast("Thanks — setting up your trial…");
+    let n = 0;
+    const iv = setInterval(async () => { await refreshPlan(); if (++n >= 6) clearInterval(iv); }, 2000);
+    router.replace("/settings");
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, checkout]);
+
   async function saveName(e) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -46,9 +48,16 @@ export default function SettingsPanel() {
   }
   async function destroy() {
     setBusy("del");
-    try { await deleteAccount(); toast("Your account and everything in it has been deleted."); router.push("/"); }
+    try { await deleteAccount(); toast("Your account, plan and everything in it has been deleted."); router.push("/"); }
     catch (ex) { setMsg({ ...msg, del: ex.message }); setBusy(""); }
   }
+  async function billing(fn, label) {
+    setBusy(label);
+    try { await fn(); } catch (ex) { toast(ex.message); setBusy(""); }
+  }
+
+  const d = describePlan(plan);
+  const canPortal = plan.hasCustomer && plan.status;
 
   return (
     <section className="wrap page settings">
@@ -69,7 +78,7 @@ export default function SettingsPanel() {
       {ready && !user && hasAccounts && (
         <div className="panel">
           <div className="panel-hd"><h3>Account</h3></div>
-          <p className="sub">Create an account to record your minute, get it graded, and keep the history across devices. An email, a username and a password.</p>
+          <p className="sub">Create an account to record your minute and get it graded — {TRIAL_DAYS} days free, then {PRICE_LABEL}. An email, a username and a password.</p>
           <div className="row-actions">
             <Link className="btn btn--primary" href="/signup">Create account</Link>
             <Link className="btn" href="/login">Log in</Link>
@@ -78,29 +87,18 @@ export default function SettingsPanel() {
       )}
 
       {user && (<>
-        <form className="panel" onSubmit={saveKey}>
-          <div className="panel-hd"><h3>OpenAI API key</h3><span className="count">{profile?.openai_api_key ? "Set" : "Not set"}</span></div>
-          <p className="sub">Recording sends your audio to OpenAI for transcription (Whisper) and grading (the model chosen below), billed to this key — roughly a cent per minute. It is stored in your account row and only ever sent to OpenAI.</p>
-          <div className="input-row" style={{ marginTop: 14 }}>
-            <input className="input" type={showKey ? "text" : "password"} autoComplete="off" placeholder="sk-…" value={key} onChange={(e) => setKey(e.target.value)} />
-            <button type="button" className="btn" onClick={() => setShowKey((s) => !s)}>{showKey ? "Hide" : "Show"}</button>
-          </div>
-          {msg.key && <div className="err">{msg.key}</div>}
-          <div className="row-actions">
-            <button className="btn btn--primary" type="submit" disabled={busy === "key"}>Save key</button>
-            {profile?.openai_api_key && <button type="button" className="btn btn--ghost" onClick={() => { setKey(""); saveApiKey("").then(() => toast("API key removed.")); }}>Remove key</button>}
-          </div>
-        </form>
-
         <div className="panel">
-          <div className="panel-hd"><h3>Grading model</h3><span className="count">{GRADING_MODELS.find((m) => m.id === model)?.label}</span></div>
-          <p className="sub">Which OpenAI model reads the transcript and writes the grade. Transcription always uses Whisper.</p>
-          <div className="seg" role="group" aria-label="Grading model" style={{ marginTop: 14 }}>
-            {GRADING_MODELS.map((m) => (
-              <button key={m.id} aria-pressed={model === m.id} onClick={() => updateProfile({ grading_model: m.id }).then(() => toast("Grading with " + m.label + ".")).catch((e) => toast(e.message))}>{m.label}</button>
-            ))}
+          <div className="panel-hd"><h3>Plan</h3><span className="count">{plan.active ? `${plan.usedToday} of ${DAILY_CAP} takes today` : ""}</span></div>
+          <p className="sub"><b style={{ color: "var(--ink)", fontWeight: 600 }}>{d.title}.</b> {d.sub}</p>
+          <div className="row-actions">
+            {!plan.active && (plan.status === "past_due" || plan.status === "unpaid") ? (
+              <button className="btn btn--primary" onClick={() => billing(openPortal, "portal")} disabled={!!busy}>Update card</button>
+            ) : !plan.active ? (
+              <button className="btn btn--primary" onClick={() => billing(startCheckout, "checkout")} disabled={!!busy}>{busy === "checkout" ? "Opening Stripe…" : plan.status ? `Subscribe · ${PRICE_LABEL}` : "Start free trial"}</button>
+            ) : null}
+            {canPortal && <button className="btn" onClick={() => billing(openPortal, "portal")} disabled={!!busy}>{busy === "portal" ? "Opening…" : "Manage billing"}</button>}
           </div>
-          <p className="sub" style={{ marginTop: 10 }}>{GRADING_MODELS.find((m) => m.id === model)?.note}</p>
+          <p className="sub" style={{ fontSize: 12.5, marginTop: 12 }}>{DAILY_CAP} graded takes a day. Cancel, change card or download invoices from Manage billing. Payments handled by Stripe; we never see your card.</p>
         </div>
 
         <form className="panel" onSubmit={saveName}>
@@ -122,7 +120,7 @@ export default function SettingsPanel() {
 
         <div className="panel">
           <div className="panel-hd"><h3>Your data</h3></div>
-          <p className="sub">Everything Impromptu holds about you — profile, settings, notes, and every graded speech with its transcript — as one JSON file.</p>
+          <p className="sub">Everything Impromptu holds about you — account, plan status, settings, notes, and every graded speech with its transcript — as one JSON file.</p>
           <div className="row-actions">
             <button className="btn" onClick={download} disabled={busy === "dl"}>{busy === "dl" ? "Preparing…" : "Download my data"}</button>
             <button className="btn btn--ghost" onClick={async () => { await logout(); toast("Signed out."); router.push("/"); }}>Log out</button>
@@ -131,7 +129,7 @@ export default function SettingsPanel() {
 
         <div className="panel danger">
           <div className="panel-hd"><h3>Delete account</h3></div>
-          <p className="sub">Removes your login, email, profile, settings and every speech, immediately. There is no undo.</p>
+          <p className="sub">Cancels any subscription immediately, then removes your login, email, profile, settings and every speech. There is no undo.</p>
           {!confirm ? (
             <div className="row-actions"><button className="btn btn--danger" onClick={() => setConfirm(true)}>Delete my account…</button></div>
           ) : (

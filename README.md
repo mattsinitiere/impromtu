@@ -4,7 +4,7 @@ Draw a topic you didn't choose. Research it, write it in your own words, present
 
 Built by Matthew Sinitiere.
 
-**v2.0.0** — Next.js + Supabase. Optional accounts (email + username + password), microphone recording, Whisper transcription, GPT grading A+ to F with filler-word counts and pointers. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
+**v2.0.0** — Next.js + Supabase + Stripe. Free to practise; accounts (email + username + password) get a 7-day trial then $3/month for up to three graded takes a day. Recording → Whisper → GPT-4o mini grade A+ to F with filler-word counts and pointers, all on the site's own OpenAI key behind authenticated API routes. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -12,30 +12,29 @@ Built by Matthew Sinitiere.
 
 ```bash
 npm install
-cp .env.local.example .env.local   # fill in the two Supabase values
+cp .env.local.example .env.local   # fill in Supabase, OpenAI and Stripe values
 npm run dev                        # -> http://localhost:3000
 ```
 
-Without `.env.local` the app still runs as a guest-only site: drawing, notes and the clock work; log in, sign up and recording are disabled with a clear message.
+Without the public Supabase values the app runs as a guest-only site: drawing, notes and the clock work; log in, sign up and recording are disabled with a clear message. Without the server values, sign-in works but recording and checkout return a clear configuration error.
 
 ## Set up Supabase (once)
 
 1. Create a project at [supabase.com](https://supabase.com). Free tier is fine.
-2. **SQL Editor** → paste and run each file in `supabase/migrations/` in order (`0001_initial.sql`, `0002_grading_model.sql`, `0003_email_auth.sql`). It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, three small functions (`username_taken`, `delete_own_account`, `handle_new_user`) and the trigger that creates a profile row for each new auth user.
+2. **SQL Editor** → paste and run each file in `supabase/migrations/` in order (`0001` → `0004`). It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, three small functions (`username_taken`, `delete_own_account`, `handle_new_user`) and the trigger that creates a profile row for each new auth user.
 3. **Authentication → Sign In / Providers → Email** → leave **"Confirm email" on** (the default). Then **Authentication → URL Configuration**: set *Site URL* to your production URL and add these *Redirect URLs*: `https://<your-domain>/**`, `https://*-<your-vercel-team>.vercel.app/**` (previews), `http://localhost:3000/**`. Confirmation and reset links redirect to `/login?confirmed=1` and `/reset-password`; if a URL isn't on that list Supabase falls back to the Site URL.
    The built-in email sender is rate-limited (a handful an hour) and often lands in spam. Fine for testing; add custom SMTP under **Authentication → SMTP** before real users.
-4. **Project Settings → API** → copy the Project URL and the anon / publishable key into `.env.local`:
+4. **Project Settings → API Keys** → the publishable key goes in `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe; RLS locks every table to its owner) and the **secret / service_role** key goes in `SUPABASE_SERVICE_ROLE_KEY` (server only — it bypasses RLS and must never be prefixed `NEXT_PUBLIC_`).
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-```
+## Set up OpenAI and Stripe (once)
 
-The anon key is safe to ship to the browser; every table is locked down by RLS so a session can only see its own rows.
+1. **OpenAI**: create a key at platform.openai.com with a monthly spend limit set, and put it in `OPENAI_API_KEY`. Every user's recording is graded on this key.
+2. **Stripe**: `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup.mjs` creates the product and the $3/month price and prints `STRIPE_PRICE_ID`. Then in the dashboard: **Developers → Webhooks → Add endpoint** `https://<your-domain>/api/billing/webhook` with the events the script lists, and copy its signing secret to `STRIPE_WEBHOOK_SECRET`. Enable **Settings → Tax → Stripe Tax** (or set `STRIPE_TAX=0`) and **Settings → Billing → Customer portal** (allow cancel + update payment method). Repeat with `sk_live_` when you go live.
+3. Local webhooks: `stripe listen --forward-to localhost:3000/api/billing/webhook` and use the `whsec_` it prints.
 
 ## Deploy it
 
-Vercel, connected to this repository, builds on every push. Add the same two environment variables in **Vercel → Project → Settings → Environment Variables** for Production and Preview. Nothing else is needed: there are no server routes and no secrets on the server.
+Vercel, connected to this repository, builds on every push. Add every variable from `.env.local.example` in **Vercel → Project → Settings → Environment Variables** for Production and Preview (use Stripe test keys on Preview). `/api/analyze` declares `maxDuration = 60` because Whisper plus grading takes 15–30 s; Vercel Hobby allows this.
 
 ## What's in the box
 
@@ -45,17 +44,26 @@ src/app/                 routes (App Router). One folder per URL.
   page.js                the app: hero, dial, topic card, workspace, recorder
   login/ signup/ forgot-password/ reset-password/ settings/ speeches/
   how/ categories/ about/ mission/ privacy/ terms/ contact/
+  api/analyze            POST audio → transcript → grade → speeches row (auth, plan, cap)
+  api/billing/checkout   POST → Stripe Checkout URL (7-day trial, card required)
+  api/billing/portal     POST → Stripe billing portal URL
+  api/billing/webhook    POST from Stripe → mirrors subscription status
+  api/account/delete     POST → cancels subscription, deletes auth user
   globals.css            design tokens and every style; light/dark via [data-theme]
 src/components/          Header, Footer, Toast, Dial, TopicCard, Workspace, Library,
                          HomeApp, AuthForm, PasswordForms, SettingsPanel, SpeechHistory,
-                         AnalysisPanel, ApiKeyModal
+                         AnalysisPanel, SubscribeModal
 src/lib/
   topics.js              the corpus (RAW), CATS/FLAT, pick/pool/daily helpers
   store.js               React context: guest state in localStorage, signed-in
                          state mirrored to user_settings; auth actions
   supabase.js            browser client (implicit flow so email links work cross-device)
-  openai.js              Whisper + chat completions; the grading rubric
+  entitlement.js         the one rule for 'may this user record now' (client + server)
   utils.js               time formatting, Wikipedia lookup, chime, JSON download
+  server/admin.js        service-role client + bearer-token verification (server only)
+  server/openai.js       Whisper + chat completions; the grading rubric (server only)
+  server/stripe.js       Stripe client, customer lookup, subscription mirroring
+scripts/stripe-setup.mjs one-time product + price creation
 src/hooks/               useTimer, useRecorder
 supabase/migrations/     schema + RLS, run by hand in the SQL editor
 public/                  favicon.svg, robots.txt
@@ -63,17 +71,26 @@ public/                  favicon.svg, robots.txt
 
 ## How recording works
 
-1. **Record the minute** (needs an account). If no OpenAI key is saved you are asked for one right there; it is stored in your `profiles` row and can be changed in Settings.
-2. `MediaRecorder` captures the mic (`webm/opus`, falling back to `mp4` on Safari) while the sixty-second clock runs. Stopping early or the clock reaching zero ends the take.
-3. The blob goes **straight from the browser** to `api.openai.com/v1/audio/transcriptions` (Whisper, prompted to keep disfluencies). Audio is never stored anywhere.
-4. Filler words are counted locally from the transcript, then transcript + counts + topic go to the user's chosen grading model (`gpt-4o-mini` by default, `gpt-4o` selectable in Settings; stored in `profiles.grading_model`) with a fixed rubric and `response_format: json_object`.
-5. The result is written to `speeches` with a `version` = number of earlier takes on that topic + 1, and rendered by `AnalysisPanel`.
+1. **Record the minute** needs a signed-in user with an active plan (trialing or active in `subscriptions`) and fewer than three takes counted today in `usage`. Otherwise the button opens the sign-in or subscribe modal.
+2. `MediaRecorder` captures the mic at 48 kbps (`webm/opus`, falling back to `mp4` on Safari) while the sixty-second clock runs. Stopping early or the clock reaching zero ends the take.
+3. The blob is POSTed to **`/api/analyze`** with the Supabase access token. The route verifies the token with the service-role client, re-checks the plan and the cap, and calls `bump_usage()` — an atomic insert-or-increment that refuses once today's count reaches three, so parallel requests cannot slip past it. Only then does it upload the audio to Whisper and the transcript to `gpt-4o-mini` on **`OPENAI_API_KEY`**. On failure the take is given back. Audio is never stored.
+4. The result is written to `speeches` (service role; the browser has no insert policy) with `version` = earlier takes on that topic + 1, and returned to `AnalysisPanel`.
 
-Cost is billed to the user's own key: roughly $0.006 for Whisper plus a fraction of a cent for the grade.
+### Economics
+
+Per graded minute ≈ $0.006 Whisper + ~$0.001 grading ≈ **0.7¢**. Stripe keeps ~$0.39 of each $3, so a subscriber nets ~$2.61 and breaks even at ~370 takes a month; the 3-a-day cap makes the worst case ~93 takes ≈ 65¢. Set a spend limit on the OpenAI key anyway.
 
 ### Grading dimensions
 
 `clarity`, `structure`, `accuracy`, `delivery` (1–10), `grade` (A+…F), `summary`, `strengths[]`, `improvements[]`, plus computed `wordCount`, `fillerTotal`, `fillers{}`, `durationSeconds`, `wpm`. The rubric lives in `src/lib/openai.js` as `RUBRIC`; edit it there. Changing it changes future grades only.
+
+## Billing model
+
+- Checkout is Stripe-hosted, subscription mode, `trial_period_days: 7`, `payment_method_collection: always`, `automatic_tax` on. Success returns to `/settings?checkout=success`, which polls the plan for ~12 s while the webhook lands.
+- The webhook mirrors every subscription event into `subscriptions` (`status`, `trial_end`, `current_period_end`, `cancel_at_period_end`); the row is the only thing the app reads. A missing or unknown status means no plan.
+- `computeEntitlement()` in `src/lib/entitlement.js` is the single rule: `trialing` or `active`, and the period end (plus 24 h grace for webhook lag) is in the future. Both the Record button and `/api/analyze` use it.
+- One trial per Stripe customer: a returning customer's checkout skips the trial.
+- Deleting an account cancels the subscription first (`/api/account/delete`); if Stripe refuses, the account is not deleted and the user is told.
 
 ## Auth model
 
@@ -82,7 +99,7 @@ Email + password via Supabase Auth, with the email confirmed before first login.
 - Confirmation link → `/login?confirmed=1` with the session in the URL fragment (implicit flow), so it works in whatever browser the email is opened in; the page notices it is signed in and goes home.
 - **Forgot password** → `/forgot-password` sends a reset link → `/reset-password` sets the new one via `auth.updateUser`. Settings also has a change-password field.
 - Username uniqueness is enforced twice: by `profiles.username unique` and, before signup, by `username_taken()` (security definer, so it works for anonymous callers).
-- `delete_own_account()` deletes the `auth.users` row for the caller; everything else cascades. This is how the browser can delete an account without the service-role key.
+- Account deletion goes through `/api/account/delete` (cancel Stripe, then `auth.admin.deleteUser`); everything else cascades.
 - Guest state is copied into `user_settings` on the first sign-in that finds no row.
 
 ## The topic corpus
@@ -104,7 +121,8 @@ Add a string to add a field; append to one to add topics. The category page, the
 
 - Guest: one `localStorage` entry, `impromptu:v2` — theme, filters, history, saved, notes, checklist ticks, cached definitions.
 - Signed in: the same shape lands in `user_settings` (debounced), and `localStorage` mirrors it so the page paints before the round trip. The first sign-in copies guest state across.
-- Speeches: `speeches` table only. Audio is discarded after transcription.
+- Speeches: `speeches` table only, written by the server. Audio is discarded after transcription.
+- Plan: `subscriptions` and `usage`, written only by the server; readable by their owner.
 
 ## Keyboard
 
@@ -120,8 +138,10 @@ Suppressed while typing in a field.
 
 ## Before going live
 
-- Set both env vars in Vercel.
-- Run all three migrations; set Site URL and Redirect URLs in Supabase; consider custom SMTP.
+- Set every env var in Vercel (live Stripe keys on Production).
+- Run all four migrations; set Site URL and Redirect URLs in Supabase; consider custom SMTP.
+- Create the live Stripe webhook and enable Stripe Tax + the customer portal.
+- Put a monthly spend limit on the OpenAI key.
 - Contact email (`src/app/contact/page.js`) and governing law (`src/app/terms/page.js`, Texas) are set; change them if either moves.
 
 ## Licence

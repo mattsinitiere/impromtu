@@ -7,11 +7,11 @@ const METRICS = [["clarity", "Clarity"], ["structure", "Structure"], ["accuracy"
    shape before it is saved): { topic, field, transcript, analysis, version, created_at }.
    `status` = "transcribing" | "grading" | "error" | null for the in-flight states. */
 export default function AnalysisPanel({ speech, status, error, onRerecord, onRetry, compact }) {
-  if (status === "transcribing" || status === "grading") {
+  if (status === "grading") {
     return (
       <div className="panel analysis">
         <div className="an-load"><span className="spinner" />
-          {status === "transcribing" ? "Transcribing your minute…" : "Grading it…"}</div>
+          Transcribing and grading your minute… this takes about twenty seconds.</div>
       </div>
     );
   }

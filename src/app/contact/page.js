@@ -27,6 +27,9 @@ export default function Contact() {
       <h2>Account problems</h2>
       <p>Forgot your password? Use <Link href="/forgot-password">the reset link</Link>. Confirmation or reset email not arriving? Check spam, then wait a minute and resend — the sender is rate-limited. If you need something removed that you cannot remove yourself from <Link href="/settings">Settings</Link>, email from the address on the account.</p>
 
+      <h2>Billing</h2>
+      <p>Change card, cancel, or download invoices from <Link href="/settings">Settings → Manage billing</Link>; it opens Stripe's portal. A cancelled plan keeps recording until the end of the period you paid for. For a refund or a charge you do not recognise, email from the address on the account with the date and amount.</p>
+
       <h2>Email</h2>
       <p>For anything that does not belong in a public issue — press, partnerships, or a private question — write to <a href="mailto:matthewsinitiere7@gmail.com">matthewsinitiere7@gmail.com</a>.</p>
 

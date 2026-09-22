@@ -21,8 +21,8 @@ export default function How() {
       </div>
       <div className="sec-hd" style={{ marginTop: 56 }}>
         <p className="eyebrow">What you need</p>
-        <h2>An account and an OpenAI key.</h2>
-        <p>Drawing topics, the notes and the clock work for anyone. Recording and grading need a free account (an email you confirm, a username and a password) and your own OpenAI API key, which you are asked for the first time you press Record. Grading a minute costs about a cent, billed to you by OpenAI. <Link href="/privacy">What gets sent where</Link>.</p>
+        <h2>Free to practise. Three dollars a month to be graded.</h2>
+        <p>Drawing topics, the notes and the clock work for anyone, forever, without an account. Recording and grading need an account (an email you confirm, a username and a password) and a plan: the first seven days are free, then it is $3 a month for up to three graded takes a day. Cancel in one click from Settings; the card is not charged until day eight. Payments are handled by Stripe. <Link href="/privacy">What gets sent where</Link>.</p>
       </div>
       <div className="row-actions"><Link className="btn btn--primary" href="/">Draw a topic</Link><Link className="btn" href="/signup">Create account</Link></div>
     </section>

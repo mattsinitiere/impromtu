@@ -9,11 +9,19 @@ The single-file static app became a Next.js application with an optional
 account and a graded speech recorder.
 
 ### Added
+- **Plans.** Practising is free. Recording and grading need a plan: a 7-day
+  free trial (card required, via Stripe Checkout with Stripe Tax), then $3 a
+  month, capped at three graded takes per UTC day. Manage, cancel and download
+  invoices from Stripe's portal in Settings. Deleting an account cancels the
+  subscription first.
+- **Server-side grading.** Audio goes to `/api/analyze`, which verifies the
+  session, the plan and the daily cap atomically, then calls OpenAI on the
+  site's own key. Users no longer supply an API key or choose a model.
 - **Record the minute.** A record button starts the microphone and the
   sixty-second clock together; the recording stops with the clock or when you
   stop early.
 - **Transcription and grading.** The audio is transcribed by OpenAI Whisper
-  and graded by GPT-4o mini (or GPT-4o, chosen in Settings) against a fixed rubric: A+ to F, with 1–10 scores
+  and graded by GPT-4o mini against a fixed rubric: A+ to F, with 1–10 scores
   for clarity, structure, accuracy and delivery, word count, length, words per
   minute, every filler word counted (locally, then handed to the model), two
   or three strengths and three or four specific pointers. The transcript is
@@ -25,14 +33,15 @@ account and a graded speech recorder.
   Backed by Supabase Auth; a database trigger creates the profile row; row-
   level security on every table. Guest state carries into a new account on
   first sign-in.
-- **Settings page.** OpenAI API key (asked for the first time you press
-  Record; editable here), display name, theme, **Download my data** (one JSON
-  file) and **Delete account** (immediate, cascading).
+- **Settings page.** Plan status and billing, display name, password, theme,
+  **Download my data** (one JSON file) and **Delete account** (immediate,
+  cascading, cancels billing).
 - **Real URLs.** `/how`, `/categories`, `/about`, `/mission`, `/privacy`,
   `/terms`, `/contact`, `/login`, `/signup`, `/forgot-password`,
   `/reset-password`, `/settings`, `/speeches`.
   Category tags and the speeches page deep-link back into the app.
-- `ROADMAP.md`, `supabase/migrations/` (three files), `.env.local.example`.
+- `ROADMAP.md`, `supabase/migrations/` (four files), `scripts/stripe-setup.mjs`,
+  `.env.local.example`.
 
 ### Changed
 - Rewritten in Next.js 15 / React 19. Same design tokens, layout, dial,

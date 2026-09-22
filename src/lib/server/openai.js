@@ -1,30 +1,36 @@
-/* Direct browser → OpenAI calls with the reader's own key.
-   Nothing here touches our server: the key and the audio go to OpenAI only. */
+import "server-only";
+
+/* Server → OpenAI with the site's own key. The browser never sees it. */
 
 const API = "https://api.openai.com/v1";
+export const GRADING_MODEL = "gpt-4o-mini";
+export const TRANSCRIBE_MODEL = "whisper-1";
 
 const FILLERS = ["um", "uh", "er", "ah", "like", "you know", "so", "basically", "actually", "literally", "kind of", "sort of", "i mean", "right", "okay"];
 
+function key() {
+  const k = process.env.OPENAI_API_KEY;
+  if (!k) throw new Error("Server is missing OPENAI_API_KEY.");
+  return k;
+}
+
 function explain(status, body) {
-  if (status === 401) return "OpenAI rejected the API key. Check it in Settings.";
-  if (status === 429) return "OpenAI rate limit or no credit on this key. Wait a moment or check your OpenAI billing.";
-  if (status === 413) return "The recording was too large to upload.";
   const m = body && body.error && body.error.message;
+  if (status === 401) return "The grading service is misconfigured (bad OpenAI key).";
+  if (status === 429) return "The grading service is busy or out of credit. Try again in a minute.";
+  if (status === 413) return "The recording was too large to upload.";
   return m ? "OpenAI: " + m : "OpenAI request failed (" + status + ").";
 }
 
-export async function transcribeAudio(blob, apiKey) {
-  const ext = /mp4/.test(blob.type) ? "mp4" : /ogg/.test(blob.type) ? "ogg" : "webm";
+export async function transcribeAudio(blob, filename) {
   const fd = new FormData();
-  fd.append("file", blob, "speech." + ext);
-  fd.append("model", "whisper-1");
+  fd.append("file", blob, filename);
+  fd.append("model", TRANSCRIBE_MODEL);
   fd.append("language", "en");
   fd.append("response_format", "verbose_json");
   // Ask Whisper to keep disfluencies so filler counts mean something.
   fd.append("prompt", "Um, uh, so, like, you know... transcribe every word exactly as spoken, including filler words.");
-  const r = await fetch(API + "/audio/transcriptions", {
-    method: "POST", headers: { Authorization: "Bearer " + apiKey }, body: fd,
-  });
+  const r = await fetch(API + "/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + key() }, body: fd });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(explain(r.status, j));
   return { text: (j.text || "").trim(), duration: j.duration ? Math.round(j.duration) : null };
@@ -64,22 +70,15 @@ Return ONLY JSON with this exact shape:
 {"grade":"B+","clarity":7,"structure":6,"accuracy":8,"delivery":7,"summary":"one sentence overall verdict","strengths":["...","..."],"improvements":["specific actionable pointer","...","..."]}
 Give 2-3 strengths and 3-4 improvements. Improvements must be specific to THIS transcript (quote a phrase where useful), not generic advice.`;
 
-export const GRADING_MODELS = [
-  { id: "gpt-4o-mini", label: "GPT-4o mini", note: "Cheapest — a fraction of a cent per grade. Fair, but can wobble at the B/C line." },
-  { id: "gpt-4o", label: "GPT-4o", note: "About 15× the grading cost (still only a few cents). Noticeably more consistent and specific." },
-];
-export const DEFAULT_MODEL = GRADING_MODELS[0].id;
-
-export async function analyzeSpeech({ transcript, topic, field, level, durationSeconds, apiKey, model }) {
+export async function analyzeSpeech({ transcript, topic, field, level, durationSeconds }) {
   const words = transcript.trim().split(/\s+/).filter(Boolean).length;
   const { fillers, total } = countFillers(transcript);
   const facts = `Topic: ${topic}\nField: ${field}\nLevel: ${level}\nDuration: ${durationSeconds ?? "~60"} seconds\nWord count: ${words}\nFiller words (counted programmatically): ${total}${total ? " — " + Object.entries(fillers).map(([k, v]) => `${k}×${v}`).join(", ") : ""}\n\nTranscript:\n"""${transcript}"""`;
   const r = await fetch(API + "/chat/completions", {
     method: "POST",
-    headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+    headers: { Authorization: "Bearer " + key(), "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: GRADING_MODELS.some((m) => m.id === model) ? model : DEFAULT_MODEL,
-      temperature: 0.3,
+      model: GRADING_MODEL, temperature: 0.3, max_tokens: 700,
       response_format: { type: "json_object" },
       messages: [{ role: "system", content: RUBRIC }, { role: "user", content: facts }],
     }),
@@ -96,13 +95,10 @@ export async function analyzeSpeech({ transcript, topic, field, level, durationS
     summary: parsed.summary || "",
     strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 4) : [],
     improvements: Array.isArray(parsed.improvements) ? parsed.improvements.slice(0, 5) : [],
-    wordCount: words,
-    fillerTotal: total,
-    fillers,
+    wordCount: words, fillerTotal: total, fillers,
     durationSeconds: durationSeconds ?? null,
     wpm: durationSeconds ? Math.round(words / durationSeconds * 60) : null,
-    model: j.model || model,
+    model: j.model || GRADING_MODEL,
+    rubric: 1,
   };
 }
-
-export function looksLikeKey(k) { return /^sk-[A-Za-z0-9_-]{20,}$/.test((k || "").trim()); }

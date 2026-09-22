@@ -34,8 +34,8 @@ export default function Mission() {
       <div className="rows">
         <div><b>Accounts are optional</b><span>Drawing, writing and the clock work without one. An account exists to keep your graded speeches.</span></div>
         <div><b>Minimal identity</b><span>An email, a username and a password. The email exists to confirm the account and reset the password; it is never shown or sold.</span></div>
-        <div><b>Your key, your bill</b><span>Grading runs on your own OpenAI key. We never see it in transit and never mark it up.</span></div>
-        <div><b>No ads, no tracking</b><span>There is no analytics script and nothing to sell.</span></div>
+        <div><b>Honest pricing</b><span>Practising is free. Grading costs real money per minute, so it is $3 a month after a free week, and capped at three takes a day so that stays true.</span></div>
+        <div><b>No ads, no tracking</b><span>There is no analytics script. The subscription is the only revenue.</span></div>
         <div><b>Open source</b><span>MIT licensed. Read it, fork it, change the topic list.</span></div>
       </div>
 

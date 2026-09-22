@@ -11,7 +11,7 @@ export default function About() {
         <p>The one-minute limit does most of the work. It's too short to hide behind detail and long enough to expose a fuzzy idea. If you can't say what something is in sixty seconds, you've found the edge of your understanding — which is the most useful thing a session can give you.</p>
         <p>Each topic arrives with a one-sentence definition pulled from Wikipedia. That is the floor, not the research — if you present the sentence you were handed, you have practised reading, not thinking. Use it to check you are chasing the right idea, then close it.</p>
         <p>The grade is there to make the gap visible, not to be optimised. It is honest about filler words because you cannot hear your own, and it tells you three things to fix because a list of ten is a list you ignore. The number that matters is the one on your fifth take, not your first.</p>
-        <p>What you write stays in your browser unless you make an account, and then it stays in your account. There is no analytics and nothing is sold. The recording goes to OpenAI on your own key, and only when you press Record. <Link href="/privacy">The details</Link>.</p>
+        <p>What you write stays in your browser unless you make an account, and then it stays in your account. There is no analytics and nothing is sold; the subscription is the business model, and it is priced to cover the grading and not much more. The recording goes to OpenAI only when you press Record, and is not kept. <Link href="/privacy">The details</Link>.</p>
       </div>
       <p className="byline">Built by <b>Matthew Sinitiere</b>.</p>
     </section>

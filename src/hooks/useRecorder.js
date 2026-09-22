@@ -28,7 +28,7 @@ export function useRecorder() {
     stream.current = s;
     chunks.current = [];
     const mime = pickMime();
-    const r = new MediaRecorder(s, mime ? { mimeType: mime } : undefined);
+    const r = new MediaRecorder(s, Object.assign({ audioBitsPerSecond: 48000 }, mime ? { mimeType: mime } : {}));
     r.ondataavailable = (e) => { if (e.data && e.data.size) chunks.current.push(e.data); };
     rec.current = r;
     r.start(250);

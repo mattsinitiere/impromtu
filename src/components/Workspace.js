@@ -8,7 +8,7 @@ const Pause = <svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" wid
 const Mic = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>;
 const Stop = <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>;
 
-export default function Workspace({ current, open, timer, recording, busy, onStartTimer, onRecord, onStopRecording, onReset }) {
+export default function Workspace({ current, open, timer, recording, busy, plan, onStartTimer, onRecord, onStopRecording, onReset }) {
   const { S, update } = useStore();
   const key = current ? current.t : "";
   const seed = hash(key);
@@ -56,7 +56,7 @@ export default function Workspace({ current, open, timer, recording, busy, onSta
         </div>
         <div className="panel-hd" style={{ margin: "18px 0 10px" }}>
           <h3>Presentation timer</h3>
-          <span className="count">{tState}</span>
+          <span className="count">{plan && plan.active ? `${tState} · ${plan.usedToday}/${plan.cap} today` : tState}</span>
         </div>
         <p className="sub" style={{ margin: 0, fontSize: 13.5 }}>
           {recording ? "Speaking. The minute ends on its own; stop early if you finish." : "Close the notes. Record it to get a grade, or just run the clock."}
@@ -65,7 +65,7 @@ export default function Workspace({ current, open, timer, recording, busy, onSta
           {recording ? (
             <button className="btn recording" onClick={onStopRecording}><span className="rec-dot" />Stop recording</button>
           ) : (
-            <button className="btn btn--primary" onClick={onRecord} disabled={busy || timer.running}>{Mic}{timer.finished ? "Record another take" : "Record the minute"}</button>
+            <button className="btn btn--primary" onClick={onRecord} disabled={busy || timer.running}>{Mic}{plan && !plan.active ? (plan.status ? "Subscribe to record" : "Record the minute · free trial") : plan && plan.remaining <= 0 ? "Recorded 3 today" : timer.finished ? "Record another take" : "Record the minute"}</button>
           )}
           <button className="btn" onClick={onStartTimer} disabled={recording || busy}>{timer.running ? Pause : Play}{startLabel}</button>
           <button className="btn btn--ghost" onClick={onReset} disabled={(!timer.started && !timer.finished) || recording || busy}>{Stop}Reset</button>

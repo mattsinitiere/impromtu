@@ -1,9 +1,10 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase, siteOrigin, EMAIL_RE, USERNAME_RE } from "./supabase";
+import { computeEntitlement, utcDay } from "./entitlement";
 
 /* ------------------------------------------------------------------
-   One provider for auth + app state.
+   One provider for auth + app state + plan.
    Guests: state lives in localStorage under "impromptu:v2".
    Signed in: state lives in user_settings (and is mirrored locally so
    the UI paints before the round trip).
@@ -31,7 +32,7 @@ export function StoreProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);       // supabase auth user
   const [profile, setProfile] = useState(null); // profiles row
-  const [recovery, setRecovery] = useState(false); // arrived via a password-reset link
+  const [plan, setPlan] = useState(computeEntitlement(null, null));
   const [toastMsg, setToastMsg] = useState("");
   const saveT = useRef(null);
   const toastT = useRef(null);
@@ -70,10 +71,22 @@ export function StoreProvider({ children }) {
     });
   }, [persist]);
 
+  /* plan = subscription row + today's usage, both readable under RLS */
+  const refreshPlan = useCallback(async (u) => {
+    const uid = u ? u.id : userRef.current && userRef.current.id;
+    if (!sb || !uid) { setPlan(computeEntitlement(null, null)); return; }
+    const [{ data: sub }, { data: usage }] = await Promise.all([
+      sb.from("subscriptions").select("*").eq("user_id", uid).maybeSingle(),
+      sb.from("usage").select("*").eq("user_id", uid).eq("day", utcDay()).maybeSingle(),
+    ]);
+    setPlan(computeEntitlement(sub, usage));
+  }, [sb]);
+
   const loadProfile = useCallback(async (u) => {
-    if (!sb || !u) { setProfile(null); return; }
+    if (!sb || !u) { setProfile(null); setPlan(computeEntitlement(null, null)); return; }
     const { data } = await sb.from("profiles").select("*").eq("id", u.id).maybeSingle();
     setProfile(data || null);
+    refreshPlan(u);
     const { data: st } = await sb.from("user_settings").select("*").eq("user_id", u.id).maybeSingle();
     if (st) {
       setS((prev) => {
@@ -91,10 +104,9 @@ export function StoreProvider({ children }) {
       });
     } else {
       // first sign-in on this account: carry the guest state across
-      const local = readLocal();
-      await sb.from("user_settings").upsert(settingsRow(u.id, local));
+      await sb.from("user_settings").upsert(settingsRow(u.id, readLocal()));
     }
-  }, [sb]);
+  }, [sb, refreshPlan]);
 
   /* boot */
   useEffect(() => {
@@ -105,13 +117,28 @@ export function StoreProvider({ children }) {
       const u = data.session ? data.session.user : null;
       setUser(u); loadProfile(u);
     });
-    const { data: sub } = sb.auth.onAuthStateChange((ev, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((_ev, session) => {
       const u = session ? session.user : null;
-      if (ev === "PASSWORD_RECOVERY") setRecovery(true);
       setUser(u); loadProfile(u);
     });
     return () => sub.subscription.unsubscribe();
   }, [sb, loadProfile]);
+
+  /* ---------- authenticated calls to our own API routes ---------- */
+  const api = useCallback(async (path, { body, form } = {}) => {
+    if (!sb) throw new Error("Accounts are not configured on this deployment.");
+    const { data } = await sb.auth.getSession();
+    const token = data.session && data.session.access_token;
+    if (!token) throw Object.assign(new Error("Sign in first."), { code: "auth" });
+    const r = await fetch(path, {
+      method: "POST",
+      headers: Object.assign({ Authorization: "Bearer " + token }, form ? {} : { "Content-Type": "application/json" }),
+      body: form ? form : JSON.stringify(body || {}),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error((j.error && j.error.message) || "Request failed (" + r.status + ")."), { code: j.error && j.error.code, status: r.status });
+    return j;
+  }, [sb]);
 
   /* ---------- auth actions ---------- */
   async function signup({ email, username, displayName, password }) {
@@ -126,14 +153,9 @@ export function StoreProvider({ children }) {
     if (taken) throw new Error("That username is taken.");
     const { data, error } = await sb.auth.signUp({
       email: e, password,
-      options: {
-        data: { username: u, display_name: displayName.trim() },
-        emailRedirectTo: siteOrigin() + "/login?confirmed=1",
-      },
+      options: { data: { username: u, display_name: displayName.trim() }, emailRedirectTo: siteOrigin() + "/login?confirmed=1" },
     });
     if (error) throw new Error(friendlyAuthError(error.message));
-    // Supabase returns a user with an empty identities array when the email
-    // is already registered (to avoid leaking that fact). Treat it honestly.
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
       throw new Error("That email already has an account. Log in, or reset the password.");
     }
@@ -163,21 +185,13 @@ export function StoreProvider({ children }) {
     if (password.length < 8) throw new Error("Password must be at least 8 characters.");
     const { error } = await sb.auth.updateUser({ password });
     if (error) throw new Error(friendlyAuthError(error.message));
-    setRecovery(false);
   }
 
   async function logout() {
     if (!sb) return;
     await sb.auth.signOut();
-    setUser(null); setProfile(null);
+    setUser(null); setProfile(null); setPlan(computeEntitlement(null, null));
     setS(readLocal());
-  }
-
-  async function saveApiKey(key) {
-    if (!sb || !user) throw new Error("Sign in to save an API key.");
-    const { error } = await sb.from("profiles").update({ openai_api_key: key || null }).eq("id", user.id);
-    if (error) throw new Error(error.message);
-    setProfile((p) => Object.assign({}, p, { openai_api_key: key || null }));
   }
 
   async function updateProfile(patch) {
@@ -188,30 +202,40 @@ export function StoreProvider({ children }) {
   }
   const updateDisplayName = (displayName) => updateProfile({ display_name: displayName.trim() });
 
+  /* ---------- billing ---------- */
+  async function startCheckout() {
+    const { url } = await api("/api/billing/checkout");
+    window.location.assign(url);
+  }
+  async function openPortal() {
+    const { url } = await api("/api/billing/portal");
+    window.location.assign(url);
+  }
+
   async function exportData() {
     if (!sb || !user) return null;
-    const [{ data: prof }, { data: settings }, { data: speeches }] = await Promise.all([
-      sb.from("profiles").select("id, username, display_name, grading_model, created_at").eq("id", user.id).maybeSingle(),
+    const [{ data: prof }, { data: settings }, { data: speeches }, { data: sub }] = await Promise.all([
+      sb.from("profiles").select("id, username, display_name, created_at").eq("id", user.id).maybeSingle(),
       sb.from("user_settings").select("*").eq("user_id", user.id).maybeSingle(),
       sb.from("speeches").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      sb.from("subscriptions").select("status, trial_end, current_period_end, cancel_at_period_end").eq("user_id", user.id).maybeSingle(),
     ]);
-    return { exported_at: new Date().toISOString(), account: { email: user.email, created_at: user.created_at }, profile: prof, settings, speeches: speeches || [] };
+    return { exported_at: new Date().toISOString(), account: { email: user.email, created_at: user.created_at }, profile: prof, plan: sub, settings, speeches: speeches || [] };
   }
 
   async function deleteAccount() {
     if (!sb || !user) return;
-    const { error } = await sb.rpc("delete_own_account");
-    if (error) throw new Error(error.message);
+    await api("/api/account/delete");
     await sb.auth.signOut();
-    setUser(null); setProfile(null);
+    setUser(null); setProfile(null); setPlan(computeEntitlement(null, null));
     try { localStorage.removeItem(KEY); } catch (e) {}
     setS({ ...EMPTY });
   }
 
   const value = {
-    S, update, ready, user, profile, recovery, toast, toastMsg,
+    S, update, ready, user, profile, plan, refreshPlan, api, toast, toastMsg,
     signup, login, logout, resendConfirmation, requestPasswordReset, updatePassword,
-    saveApiKey, updateDisplayName, updateProfile, exportData, deleteAccount,
+    updateDisplayName, updateProfile, exportData, deleteAccount, startCheckout, openPortal,
     sb,
     setTheme: (t) => update({ theme: t }),
     hasAccounts: !!sb,

@@ -7,7 +7,8 @@ move between sections as the shape of the thing becomes clearer.
 ## Shipped in v2.0
 
 - Accounts (email + username + password, confirmed email, reset by email), Supabase backend
-- Record the minute, Whisper transcription, GPT grading A+ → F
+- Record the minute, Whisper transcription, GPT grading A+ → F, on the site's key
+- 7-day trial then $3/month via Stripe, 3 graded takes a day
 - Filler-word counting, four scored dimensions, strengths and pointers
 - Speech history with takes per topic, re-record, delete, export, delete account
 
@@ -30,8 +31,8 @@ if the number is fair.
 - [ ] **Progress dashboard.** Grades over time, filler words per take trending
       down (or not), which fields you dodge, which you score best in.
 - [ ] **Streaks and a weekly rhythm**, quietly. A dot per day, no notifications.
-- [ ] **Bring-your-own model.** Anthropic and local (Ollama) as grading
-      backends alongside OpenAI; same rubric, same JSON shape.
+- [ ] **A higher tier.** More takes a day and GPT-4o grading for people who
+      practise seriously, priced to stay profitable at the cap.
 - [ ] **Custom topic pools.** Paste your own list (interview prep, a syllabus,
       a company's product areas) and draw from it privately.
 
@@ -96,6 +97,12 @@ The reason the grade has to be trustworthy first.
 - [ ] Shareable clip: a card with the topic, grade and one quoted line, for
       people who want to post it.
 - [ ] Public API so other tools can push topics in and pull grades out.
+
+## Ops
+
+- [ ] Custom SMTP for auth mail; Stripe emails for receipts and failed payments.
+- [ ] Admin view: takes per day, OpenAI spend vs. revenue, failed webhooks.
+- [ ] Annual plan at a discount once churn is understood.
 
 ## Explicitly not planned
 

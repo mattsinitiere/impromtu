@@ -6,16 +6,16 @@ import TopicCard from "./TopicCard";
 import Workspace from "./Workspace";
 import Library from "./Library";
 import AnalysisPanel from "./AnalysisPanel";
-import ApiKeyModal from "./ApiKeyModal";
-import { CATS, FLAT, LEVEL, dailyTopic, findTopic, pickTopic, poolFor } from "@/lib/topics";
+import SubscribeModal from "./SubscribeModal";
+import { CATS, dailyTopic, findTopic, pickTopic, poolFor } from "@/lib/topics";
 import { useStore } from "@/lib/store";
 import { useTimer } from "@/hooks/useTimer";
 import { useRecorder } from "@/hooks/useRecorder";
-import { analyzeSpeech, transcribeAudio } from "@/lib/openai";
 import { chime, wikiLookup } from "@/lib/utils";
+import { DAILY_CAP } from "@/lib/entitlement";
 
 export default function HomeApp() {
-  const { S, update, ready, user, profile, hasAccounts, toast, sb, setTheme } = useStore();
+  const { S, update, ready, user, plan, refreshPlan, api, hasAccounts, toast, setTheme } = useStore();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -31,11 +31,11 @@ export default function HomeApp() {
 
   /* recording + analysis */
   const recorder = useRecorder();
-  const [status, setStatus] = useState(null);      // transcribing | grading | error | null
+  const [status, setStatus] = useState(null);      // grading | error | null
   const [anError, setAnError] = useState("");
   const [result, setResult] = useState(null);      // saved speech row
-  const [keyModal, setKeyModal] = useState(false);
   const [signinModal, setSigninModal] = useState(false);
+  const [subModal, setSubModal] = useState(false);
   const lastBlob = useRef(null);
   const cardRef = useRef(null);
   const workRef = useRef(null);
@@ -158,7 +158,8 @@ export default function HomeApp() {
   async function startRecording() {
     if (!current) return;
     if (!hasAccounts || !user) { setSigninModal(true); return; }
-    if (!profile || !profile.openai_api_key) { setKeyModal(true); return; }
+    if (!plan.active) { setSubModal(true); return; }
+    if (plan.remaining <= 0) { toast(`That's ${DAILY_CAP} graded takes today. The count resets at midnight UTC.`); return; }
     try {
       timer.reset();
       await recorder.start();
@@ -179,34 +180,29 @@ export default function HomeApp() {
 
   async function runAnalysis() {
     const job = lastBlob.current;
-    if (!job || !profile) return;
-    const key = profile.openai_api_key;
+    if (!job) return;
     try {
-      setStatus("transcribing"); setAnError("");
-      const { text, duration } = await transcribeAudio(job.blob, key);
-      if (!text || text.split(/\s+/).length < 5) throw new Error("Whisper heard almost nothing. Check your microphone and try again.");
-      setStatus("grading");
-      const analysis = await analyzeSpeech({
-        transcript: text, topic: job.topic.t, field: job.topic.c, level: LEVEL[job.topic.d],
-        durationSeconds: duration || job.seconds, apiKey: key, model: profile.grading_model,
-      });
-      // version = number of earlier takes on this topic + 1
-      const { count } = await sb.from("speeches").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("topic", job.topic.t);
-      const row = {
-        user_id: user.id, topic: job.topic.t, field: job.topic.c, difficulty: job.topic.d,
-        transcript: text, analysis, duration_seconds: analysis.durationSeconds, word_count: analysis.wordCount,
-        grade: analysis.grade, version: (count || 0) + 1,
-      };
-      const { data, error } = await sb.from("speeches").insert(row).select().single();
-      if (error) throw new Error("Graded, but saving failed: " + error.message);
-      setResult(data); setStatus(null);
-      toast("Graded: " + analysis.grade);
-    } catch (e) { setStatus("error"); setAnError(e.message); }
+      setStatus("grading"); setAnError("");
+      const fd = new FormData();
+      fd.append("audio", job.blob, "speech");
+      fd.append("topic", job.topic.t);
+      fd.append("seconds", String(job.seconds));
+      const { speech } = await api("/api/analyze", { form: fd });
+      setResult(speech); setStatus(null);
+      refreshPlan();
+      toast("Graded: " + speech.grade);
+    } catch (e) {
+      setStatus(null);
+      if (e.code === "subscribe") { setSubModal(true); refreshPlan(); return; }
+      if (e.code === "auth") { setSigninModal(true); return; }
+      setStatus("error"); setAnError(e.message);
+      if (e.code === "cap") refreshPlan();
+    }
   }
 
   function rerecord() { setResult(null); setStatus(null); timer.reset(); startRecording(); }
 
-  const busy = status === "transcribing" || status === "grading";
+  const busy = status === "grading";
 
   return (
     <>
@@ -236,6 +232,7 @@ export default function HomeApp() {
 
         <div ref={workRef}>
           <Workspace current={current} open={workOpen && !!current} timer={timer} recording={recorder.recording} busy={busy}
+            plan={user ? plan : null}
             onStartTimer={() => (timer.running ? timer.pause() : (timer.finished && timer.reset(), timer.start()))}
             onRecord={startRecording} onStopRecording={finishRecording}
             onReset={() => { timer.reset(); }} />
@@ -247,12 +244,12 @@ export default function HomeApp() {
         <Library onPick={setTopic} />
       </section>
 
-      {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} onSaved={() => { setKeyModal(false); setTimeout(startRecording, 50); }} />}
+      {subModal && <SubscribeModal onClose={() => setSubModal(false)} />}
       {signinModal && (
         <div className="modal-bg" onClick={() => setSigninModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Create an account to record</h3>
-            <p>{hasAccounts ? "Graded speeches are saved to your account so you can watch them improve. It takes an email, a username and a password. Drawing topics and running the clock work without one." : "This deployment has no account backend configured, so recording is unavailable."}</p>
+            <p>{hasAccounts ? "Graded speeches are saved to your account so you can watch them improve. It takes an email, a username and a password; the first week is free. Drawing topics and running the clock work without one." : "This deployment has no account backend configured, so recording is unavailable."}</p>
             <div className="acts">
               <button className="btn btn--ghost" onClick={() => setSigninModal(false)}>Not now</button>
               {hasAccounts && <Link className="btn" href="/login">Log in</Link>}
