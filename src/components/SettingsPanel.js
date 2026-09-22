@@ -3,11 +3,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
-import { looksLikeKey } from "@/lib/openai";
+import { looksLikeKey, GRADING_MODELS, DEFAULT_MODEL } from "@/lib/openai";
 import { downloadJSON } from "@/lib/utils";
 
 export default function SettingsPanel() {
-  const { S, setTheme, user, profile, hasAccounts, saveApiKey, updateDisplayName, exportData, deleteAccount, logout, toast, ready } = useStore();
+  const { S, setTheme, user, profile, hasAccounts, saveApiKey, updateDisplayName, updateProfile, exportData, deleteAccount, logout, toast, ready } = useStore();
+  const model = profile?.grading_model || DEFAULT_MODEL;
   const router = useRouter();
   const [key, setKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -78,7 +79,7 @@ export default function SettingsPanel() {
       {user && (<>
         <form className="panel" onSubmit={saveKey}>
           <div className="panel-hd"><h3>OpenAI API key</h3><span className="count">{profile?.openai_api_key ? "Set" : "Not set"}</span></div>
-          <p className="sub">Recording sends your audio to OpenAI for transcription (Whisper) and grading (GPT-4o mini), billed to this key — roughly a cent per minute. It is stored in your account row and only ever sent to OpenAI.</p>
+          <p className="sub">Recording sends your audio to OpenAI for transcription (Whisper) and grading (the model chosen below), billed to this key — roughly a cent per minute. It is stored in your account row and only ever sent to OpenAI.</p>
           <div className="input-row" style={{ marginTop: 14 }}>
             <input className="input" type={showKey ? "text" : "password"} autoComplete="off" placeholder="sk-…" value={key} onChange={(e) => setKey(e.target.value)} />
             <button type="button" className="btn" onClick={() => setShowKey((s) => !s)}>{showKey ? "Hide" : "Show"}</button>
@@ -89,6 +90,17 @@ export default function SettingsPanel() {
             {profile?.openai_api_key && <button type="button" className="btn btn--ghost" onClick={() => { setKey(""); saveApiKey("").then(() => toast("API key removed.")); }}>Remove key</button>}
           </div>
         </form>
+
+        <div className="panel">
+          <div className="panel-hd"><h3>Grading model</h3><span className="count">{GRADING_MODELS.find((m) => m.id === model)?.label}</span></div>
+          <p className="sub">Which OpenAI model reads the transcript and writes the grade. Transcription always uses Whisper.</p>
+          <div className="seg" role="group" aria-label="Grading model" style={{ marginTop: 14 }}>
+            {GRADING_MODELS.map((m) => (
+              <button key={m.id} aria-pressed={model === m.id} onClick={() => updateProfile({ grading_model: m.id }).then(() => toast("Grading with " + m.label + ".")).catch((e) => toast(e.message))}>{m.label}</button>
+            ))}
+          </div>
+          <p className="sub" style={{ marginTop: 10 }}>{GRADING_MODELS.find((m) => m.id === model)?.note}</p>
+        </div>
 
         <form className="panel" onSubmit={saveName}>
           <div className="panel-hd"><h3>Display name</h3></div>

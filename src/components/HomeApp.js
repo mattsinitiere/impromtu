@@ -188,7 +188,7 @@ export default function HomeApp() {
       setStatus("grading");
       const analysis = await analyzeSpeech({
         transcript: text, topic: job.topic.t, field: job.topic.c, level: LEVEL[job.topic.d],
-        durationSeconds: duration || job.seconds, apiKey: key,
+        durationSeconds: duration || job.seconds, apiKey: key, model: profile.grading_model,
       });
       // version = number of earlier takes on this topic + 1
       const { count } = await sb.from("speeches").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("topic", job.topic.t);

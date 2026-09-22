@@ -64,7 +64,13 @@ Return ONLY JSON with this exact shape:
 {"grade":"B+","clarity":7,"structure":6,"accuracy":8,"delivery":7,"summary":"one sentence overall verdict","strengths":["...","..."],"improvements":["specific actionable pointer","...","..."]}
 Give 2-3 strengths and 3-4 improvements. Improvements must be specific to THIS transcript (quote a phrase where useful), not generic advice.`;
 
-export async function analyzeSpeech({ transcript, topic, field, level, durationSeconds, apiKey }) {
+export const GRADING_MODELS = [
+  { id: "gpt-4o-mini", label: "GPT-4o mini", note: "Cheapest — a fraction of a cent per grade. Fair, but can wobble at the B/C line." },
+  { id: "gpt-4o", label: "GPT-4o", note: "About 15× the grading cost (still only a few cents). Noticeably more consistent and specific." },
+];
+export const DEFAULT_MODEL = GRADING_MODELS[0].id;
+
+export async function analyzeSpeech({ transcript, topic, field, level, durationSeconds, apiKey, model }) {
   const words = transcript.trim().split(/\s+/).filter(Boolean).length;
   const { fillers, total } = countFillers(transcript);
   const facts = `Topic: ${topic}\nField: ${field}\nLevel: ${level}\nDuration: ${durationSeconds ?? "~60"} seconds\nWord count: ${words}\nFiller words (counted programmatically): ${total}${total ? " — " + Object.entries(fillers).map(([k, v]) => `${k}×${v}`).join(", ") : ""}\n\nTranscript:\n"""${transcript}"""`;
@@ -72,7 +78,7 @@ export async function analyzeSpeech({ transcript, topic, field, level, durationS
     method: "POST",
     headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: GRADING_MODELS.some((m) => m.id === model) ? model : DEFAULT_MODEL,
       temperature: 0.3,
       response_format: { type: "json_object" },
       messages: [{ role: "system", content: RUBRIC }, { role: "user", content: facts }],
@@ -95,6 +101,7 @@ export async function analyzeSpeech({ transcript, topic, field, level, durationS
     fillers,
     durationSeconds: durationSeconds ?? null,
     wpm: durationSeconds ? Math.round(words / durationSeconds * 60) : null,
+    model: j.model || model,
   };
 }
 

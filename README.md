@@ -21,7 +21,7 @@ Without `.env.local` the app still runs as a guest-only site: drawing, notes and
 ## Set up Supabase (once)
 
 1. Create a project at [supabase.com](https://supabase.com). Free tier is fine.
-2. **SQL Editor** → paste and run `supabase/migrations/0001_initial.sql`. It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, and two small functions (`username_taken`, `delete_own_account`).
+2. **SQL Editor** → paste and run each file in `supabase/migrations/` in order (`0001_initial.sql`, then `0002_grading_model.sql`). It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, and two small functions (`username_taken`, `delete_own_account`).
 3. **Authentication → Providers → Email** → turn **off** "Confirm email". Usernames are stored as `username@impromptu.app`; that address doesn't exist, so confirmation can never complete.
 4. **Project Settings → API** → copy the Project URL and the anon / publishable key into `.env.local`:
 
@@ -65,7 +65,7 @@ public/                  favicon.svg, robots.txt
 1. **Record the minute** (needs an account). If no OpenAI key is saved you are asked for one right there; it is stored in your `profiles` row and can be changed in Settings.
 2. `MediaRecorder` captures the mic (`webm/opus`, falling back to `mp4` on Safari) while the sixty-second clock runs. Stopping early or the clock reaching zero ends the take.
 3. The blob goes **straight from the browser** to `api.openai.com/v1/audio/transcriptions` (Whisper, prompted to keep disfluencies). Audio is never stored anywhere.
-4. Filler words are counted locally from the transcript, then transcript + counts + topic go to `gpt-4o-mini` with a fixed rubric and `response_format: json_object`.
+4. Filler words are counted locally from the transcript, then transcript + counts + topic go to the user's chosen grading model (`gpt-4o-mini` by default, `gpt-4o` selectable in Settings; stored in `profiles.grading_model`) with a fixed rubric and `response_format: json_object`.
 5. The result is written to `speeches` with a `version` = number of earlier takes on that topic + 1, and rendered by `AnalysisPanel`.
 
 Cost is billed to the user's own key: roughly $0.006 for Whisper plus a fraction of a cent for the grade.
@@ -117,9 +117,9 @@ Suppressed while typing in a field.
 
 ## Before going live
 
-- Replace `hello@example.com` in `src/app/contact/page.js`.
-- Check the governing-law clause in `src/app/terms/page.js` (currently Texas).
-- Set both env vars in Vercel, and run the migration + turn off email confirmation in Supabase.
+- Set both env vars in Vercel.
+- Run both migrations and turn off email confirmation in Supabase.
+- Contact email (`src/app/contact/page.js`) and governing law (`src/app/terms/page.js`, Texas) are set; change them if either moves.
 
 ## Licence
 

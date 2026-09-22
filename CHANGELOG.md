@@ -13,7 +13,7 @@ account and a graded speech recorder.
   sixty-second clock together; the recording stops with the clock or when you
   stop early.
 - **Transcription and grading.** The audio is transcribed by OpenAI Whisper
-  and graded by GPT-4o mini against a fixed rubric: A+ to F, with 1–10 scores
+  and graded by GPT-4o mini (or GPT-4o, chosen in Settings) against a fixed rubric: A+ to F, with 1–10 scores
   for clarity, structure, accuracy and delivery, word count, length, words per
   minute, every filler word counted (locally, then handed to the model), two
   or three strengths and three or four specific pointers. The transcript is

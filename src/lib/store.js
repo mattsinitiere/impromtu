@@ -158,12 +158,13 @@ export function StoreProvider({ children }) {
     setProfile((p) => Object.assign({}, p, { openai_api_key: key || null }));
   }
 
-  async function updateDisplayName(displayName) {
-    if (!sb || !user) return;
-    const { error } = await sb.from("profiles").update({ display_name: displayName.trim() }).eq("id", user.id);
+  async function updateProfile(patch) {
+    if (!sb || !user) throw new Error("Sign in first.");
+    const { error } = await sb.from("profiles").update(patch).eq("id", user.id);
     if (error) throw new Error(error.message);
-    setProfile((p) => Object.assign({}, p, { display_name: displayName.trim() }));
+    setProfile((p) => Object.assign({}, p, patch));
   }
+  const updateDisplayName = (displayName) => updateProfile({ display_name: displayName.trim() });
 
   async function exportData() {
     if (!sb || !user) return null;
@@ -187,7 +188,7 @@ export function StoreProvider({ children }) {
 
   const value = {
     S, update, ready, user, profile, toast, toastMsg,
-    signup, login, logout, saveApiKey, updateDisplayName, exportData, deleteAccount,
+    signup, login, logout, saveApiKey, updateDisplayName, updateProfile, exportData, deleteAccount,
     sb,
     setTheme: (t) => update({ theme: t }),
     hasAccounts: !!sb,

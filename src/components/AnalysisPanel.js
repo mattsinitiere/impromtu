@@ -35,7 +35,7 @@ export default function AnalysisPanel({ speech, status, error, onRerecord, onRet
       <div className="an-top">
         <div className={"grade " + gradeClass(a.grade)}>{a.grade}</div>
         <div className="an-sum">
-          <span className="eyebrow">{speech.field}{speech.version > 1 ? " · take " + speech.version : ""}</span>
+          <span className="eyebrow">{speech.field}{speech.version > 1 ? " · take " + speech.version : ""}{a.model ? " · " + a.model : ""}</span>
           <h3>{speech.topic}</h3>
           <p>{a.summary}</p>
           <div className="stats">

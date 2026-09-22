@@ -28,7 +28,7 @@ export default function Contact() {
       <p>There is no password reset, because there is no email on file. If you are locked out, create a new account. If you need something removed that you cannot remove yourself from <Link href="/settings">Settings</Link>, email with your username.</p>
 
       <h2>Email</h2>
-      <p>For anything that does not belong in a public issue — press, partnerships, or a private question — write to <a href="mailto:hello@example.com">hello@example.com</a>.</p>
+      <p>For anything that does not belong in a public issue — press, partnerships, or a private question — write to <a href="mailto:matthewsinitiere7@gmail.com">matthewsinitiere7@gmail.com</a>.</p>
 
       <h2>What to expect</h2>
       <div className="rows">
