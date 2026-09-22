@@ -42,12 +42,13 @@ export const POST = route(async (req) => {
 
   try {
     const ext = /mp4/.test(audio.type) ? "mp4" : /ogg/.test(audio.type) ? "ogg" : "webm";
-    const { text, duration } = await transcribeAudio(audio, "speech." + ext);
+    const { text, duration, model: transcribeModel } = await transcribeAudio(audio, "speech." + ext);
     if (!text || text.split(/\s+/).length < 5) throw new Error("Almost nothing was heard. Check your microphone and try again.");
     const analysis = await analyzeSpeech({
       transcript: text, topic: topic.t, field: topic.c, level: LEVEL[topic.d],
       durationSeconds: duration || seconds,
     });
+    analysis.transcribeModel = transcribeModel;
     const { count } = await db.from("speeches").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("topic", topic.t);
     const { data: row, error } = await db.from("speeches").insert({
       user_id: user.id, topic: topic.t, field: topic.c, difficulty: topic.d,

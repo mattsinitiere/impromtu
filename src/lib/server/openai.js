@@ -3,8 +3,15 @@ import "server-only";
 /* Server → OpenAI with the site's own key. The browser never sees it. */
 
 const API = "https://api.openai.com/v1";
-export const GRADING_MODEL = "gpt-4o-mini";
-export const TRANSCRIBE_MODEL = "whisper-1";
+
+/* Both models are chosen by env var so they can be changed in Vercel without
+   a deploy. Grading: any chat model that supports response_format json_object
+   (gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-4.1, …). Transcription: whisper-1,
+   gpt-4o-mini-transcribe or gpt-4o-transcribe. The model actually used is
+   recorded on each analysis. */
+export const GRADING_MODEL = (process.env.OPENAI_GRADING_MODEL || "gpt-4o-mini").trim();
+export const TRANSCRIBE_MODEL = (process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1").trim();
+const TRANSCRIBE_IS_WHISPER = /^whisper/.test(TRANSCRIBE_MODEL);
 
 const FILLERS = ["um", "uh", "er", "ah", "like", "you know", "so", "basically", "actually", "literally", "kind of", "sort of", "i mean", "right", "okay"];
 
@@ -27,13 +34,14 @@ export async function transcribeAudio(blob, filename) {
   fd.append("file", blob, filename);
   fd.append("model", TRANSCRIBE_MODEL);
   fd.append("language", "en");
-  fd.append("response_format", "verbose_json");
+  // verbose_json (with duration) is Whisper-only; the gpt-4o-*-transcribe models accept json/text.
+  fd.append("response_format", TRANSCRIBE_IS_WHISPER ? "verbose_json" : "json");
   // Ask Whisper to keep disfluencies so filler counts mean something.
   fd.append("prompt", "Um, uh, so, like, you know... transcribe every word exactly as spoken, including filler words.");
   const r = await fetch(API + "/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + key() }, body: fd });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(explain(r.status, j));
-  return { text: (j.text || "").trim(), duration: j.duration ? Math.round(j.duration) : null };
+  return { text: (j.text || "").trim(), duration: j.duration ? Math.round(j.duration) : null, model: TRANSCRIBE_MODEL };
 }
 
 /* Local, deterministic filler count. The model gets this as ground truth

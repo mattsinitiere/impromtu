@@ -28,7 +28,7 @@ Without the public Supabase values the app runs as a guest-only site: drawing, n
 
 ## Set up OpenAI (and, later, Stripe)
 
-1. **OpenAI**: create a key at platform.openai.com with a monthly spend limit set, and put it in `OPENAI_API_KEY`. Every user's recording is graded on this key.
+1. **OpenAI**: create a key at platform.openai.com with a monthly spend limit set, and put it in `OPENAI_API_KEY`. Every user's recording is graded on this key. Optionally pick the models: `OPENAI_GRADING_MODEL` (default `gpt-4o-mini`; `gpt-4o` is ~15× the grading cost and more consistent) and `OPENAI_TRANSCRIBE_MODEL` (default `whisper-1`; `gpt-4o-mini-transcribe` / `gpt-4o-transcribe` are more accurate but tend to drop filler words, which the grade counts). Each analysis records the models that produced it.
 2. **Stripe (only when turning billing on)**: set `NEXT_PUBLIC_BILLING=1`, then `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup.mjs` creates the product and the $3/month price and prints `STRIPE_PRICE_ID`. Then in the dashboard: **Developers → Webhooks → Add endpoint** `https://<your-domain>/api/billing/webhook` with the events the script lists, and copy its signing secret to `STRIPE_WEBHOOK_SECRET`. Enable **Settings → Tax → Stripe Tax** (or set `STRIPE_TAX=0`) and **Settings → Billing → Customer portal** (allow cancel + update payment method). Repeat with `sk_live_` when you go live.
 3. Local webhooks: `stripe listen --forward-to localhost:3000/api/billing/webhook` and use the `whsec_` it prints.
 
