@@ -1,106 +1,107 @@
 # Impromptu
 
-Draw a topic you didn't choose. Research it, write it in your own words, present it for one minute.
+Draw a topic you didn't choose. Research it, write it in your own words, present it for one minute — then get it graded.
 
 Built by Matthew Sinitiere.
 
-**v1.0.0** — one HTML file, no build step, no dependencies, no tracking.
+**v2.0.0** — Next.js + Supabase. Optional accounts (username and password only), microphone recording, Whisper transcription, GPT grading A+ to F with filler-word counts and pointers. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
 
 ---
 
-## Run it
-
-Double-click `index.html`. That's the whole install.
-
-To serve it locally (needed if you want the favicon and font requests to behave exactly as they will in production):
+## Run it locally
 
 ```bash
-python3 -m http.server 8000
-# -> http://localhost:8000
+npm install
+cp .env.local.example .env.local   # fill in the two Supabase values
+npm run dev                        # -> http://localhost:3000
 ```
+
+Without `.env.local` the app still runs as a guest-only site: drawing, notes and the clock work; log in, sign up and recording are disabled with a clear message.
+
+## Set up Supabase (once)
+
+1. Create a project at [supabase.com](https://supabase.com). Free tier is fine.
+2. **SQL Editor** → paste and run `supabase/migrations/0001_initial.sql`. It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, and two small functions (`username_taken`, `delete_own_account`).
+3. **Authentication → Providers → Email** → turn **off** "Confirm email". Usernames are stored as `username@impromptu.app`; that address doesn't exist, so confirmation can never complete.
+4. **Project Settings → API** → copy the Project URL and the anon / publishable key into `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+The anon key is safe to ship to the browser; every table is locked down by RLS so a session can only see its own rows.
 
 ## Deploy it
 
-Any static host. Drop the folder in and you're done.
-
-```bash
-npx vercel deploy --prod     # Vercel
-npx netlify deploy --prod    # Netlify
-```
-
-GitHub Pages: push the folder to a repo, then Settings -> Pages -> deploy from branch root.
+Vercel, connected to this repository, builds on every push. Add the same two environment variables in **Vercel → Project → Settings → Environment Variables** for Production and Preview. Nothing else is needed: there are no server routes and no secrets on the server.
 
 ## What's in the box
 
 ```
-index.html      the entire application - markup, styles, logic, topic corpus
-mission.html    why it exists and how to use it
-privacy.html    what is stored, what is sent, how to delete it
-terms.html      MIT licence, no warranty, third-party content
-contact.html    bug reports, topic suggestions, email
-page.css        shared stylesheet for the four pages above
-favicon.svg     wordmark favicon
-robots.txt      crawler policy (add your sitemap once the domain is live)
-README.md       this file
-CHANGELOG.md    release notes
-LICENSE         MIT
-.editorconfig   two-space indents, LF, UTF-8
-.gitignore      OS, editor and host artefacts
+src/app/                 routes (App Router). One folder per URL.
+  layout.js              header, footer, toast, theme, store provider
+  page.js                the app: hero, dial, topic card, workspace, recorder
+  login/ signup/ settings/ speeches/
+  how/ categories/ about/ mission/ privacy/ terms/ contact/
+  globals.css            design tokens and every style; light/dark via [data-theme]
+src/components/          Header, Footer, Toast, Dial, TopicCard, Workspace, Library,
+                         HomeApp, AuthForm, SettingsPanel, SpeechHistory,
+                         AnalysisPanel, ApiKeyModal
+src/lib/
+  topics.js              the corpus (RAW), CATS/FLAT, pick/pool/daily helpers
+  store.js               React context: guest state in localStorage, signed-in
+                         state mirrored to user_settings; auth actions
+  supabase.js            browser client; username <-> synthetic email
+  openai.js              Whisper + chat completions; the grading rubric
+  utils.js               time formatting, Wikipedia lookup, chime, JSON download
+src/hooks/               useTimer, useRecorder
+supabase/migrations/     schema + RLS, run by hand in the SQL editor
+public/                  favicon.svg, robots.txt
 ```
 
-`index.html` stays self-contained and does not use `page.css`. The four standalone
-pages share it, and each inherits the theme the reader picked in the app by
-reading the same `localStorage` key.
+## How recording works
 
-### Before going live
+1. **Record the minute** (needs an account). If no OpenAI key is saved you are asked for one right there; it is stored in your `profiles` row and can be changed in Settings.
+2. `MediaRecorder` captures the mic (`webm/opus`, falling back to `mp4` on Safari) while the sixty-second clock runs. Stopping early or the clock reaching zero ends the take.
+3. The blob goes **straight from the browser** to `api.openai.com/v1/audio/transcriptions` (Whisper, prompted to keep disfluencies). Audio is never stored anywhere.
+4. Filler words are counted locally from the transcript, then transcript + counts + topic go to `gpt-4o-mini` with a fixed rubric and `response_format: json_object`.
+5. The result is written to `speeches` with a `version` = number of earlier takes on that topic + 1, and rendered by `AnalysisPanel`.
 
-- **Replace the contact email.** `contact.html` ships with `hello@example.com`.
-- **Confirm the repository URL.** Every page links to
-  `https://github.com/mattsinitiere/impromtu` — note the spelling.
-- **Check the governing-law clause** in `terms.html`; it currently names Texas.
+Cost is billed to the user's own key: roughly $0.006 for Whisper plus a fraction of a cent for the grade.
 
-There is no `package.json` and no toolchain. Nothing here compiles, bundles or
-installs — what you edit is what ships.
+### Grading dimensions
+
+`clarity`, `structure`, `accuracy`, `delivery` (1–10), `grade` (A+…F), `summary`, `strengths[]`, `improvements[]`, plus computed `wordCount`, `fillerTotal`, `fillers{}`, `durationSeconds`, `wpm`. The rubric lives in `src/lib/openai.js` as `RUBRIC`; edit it there. Changing it changes future grades only.
+
+## Auth model
+
+Supabase Auth needs an email-shaped identifier, so `username` becomes `username@impromptu.app`. The UI never mentions email. Consequences worth knowing:
+
+- No password reset. The signup form says so.
+- Username uniqueness is enforced twice: by `profiles.username unique` and, before signup, by the `username_taken()` function (security definer, so it works for anonymous callers).
+- `delete_own_account()` deletes the `auth.users` row for the caller; everything else cascades. This is how the browser can delete an account without the service-role key.
 
 ## The topic corpus
 
 1,117 topics across 107 fields, each tagged `1` beginner, `2` intermediate, `3` advanced.
 
-Find `const RAW = [` in `index.html`. The format is one string per field:
+`src/lib/topics.js`, `RAW`. One string per field:
 
 ```
 "Field Name|Topic One~1|Topic Two~3|Topic Three~2"
 ```
 
-To add a field, add a string. To add topics, append to an existing one. Everything downstream — the category picker, the counts on the Categories page, the daily topic, the filters — reads from this array, so nothing else needs touching.
+Add a string to add a field; append to one to add topics. The category page, the picker, the counts, the daily topic and the filters all read from it.
 
-Two rules that keep the pool worth drawing from:
+- **No `&`, `<` or `>` characters** in names.
+- **Timeless only.** If it won't be worth understanding in ten years, it doesn't belong.
 
-- **No `&`, `<` or `>` characters.** Topic names are written into the DOM as HTML.
-- **Timeless only.** If it won't be worth understanding in ten years, it doesn't belong. No news, no celebrities, no trivia.
+## Storage
 
-## Storage and theme
-
-State (theme, filters, history, saved topics, notes, checklists, cached definitions) lives in `localStorage` under the key `impromptu:v1`. There is no backend, no account, no analytics.
-
-Light mode is the default on a first visit. The site deliberately does not follow the operating system setting — if the reader picks dark, that choice sticks from then on.
-
-If you want state to sync across devices, replace the `store` object near the top of the script. It exposes only `get(key)` and `set(key, value)`, both async, so swapping in a call to your own API is a contained change.
-
-## Definitions
-
-When a topic lands, the app fetches a one-sentence definition from the Wikipedia
-REST API and shows it under the title. Lookups run in two steps: the topic name
-is tried as an article title first, then as a search query if that misses.
-Results are cached in `localStorage`, so a repeat topic is instant and offline.
-
-This is the only outbound request in the app apart from fonts, and it sends
-nothing but the topic name. If the request fails — offline, blocked, or the
-subject is filed under another name — the panel says so and offers a search link
-rather than showing nothing.
-
-To remove the dependency entirely, delete `loadDef`, `wikiLookup`, `wikiSummary`
-and the two calls to `loadDef()`. The rest of the app is unaffected.
+- Guest: one `localStorage` entry, `impromptu:v2` — theme, filters, history, saved, notes, checklist ticks, cached definitions.
+- Signed in: the same shape lands in `user_settings` (debounced), and `localStorage` mirrors it so the page paints before the round trip. Creating an account copies guest state across.
+- Speeches: `speeches` table only. Audio is discarded after transcription.
 
 ## Keyboard
 
@@ -112,19 +113,13 @@ and the two calls to `loadDef()`. The rest of the app is unaffected.
 | `T` | Toggle light and dark |
 | `Esc` | Close the field picker |
 
-Shortcuts are suppressed while you're typing in the notes field.
+Suppressed while typing in a field.
 
-## Type
+## Before going live
 
-The wordmark and headings are Inter; the dial, labels and counters are JetBrains Mono. Both load from Google Fonts.
-
-If you'd rather not depend on that — for privacy, or for offline use — delete the three `<link>` tags in `<head>`. The stack falls back to SF Pro on macOS and Segoe UI Variable on Windows, which is a small visual change, not a broken one. To self-host instead, drop the woff2 files in a `fonts/` folder and add `@font-face` rules at the top of the `<style>` block.
-
-## Known limits
-
-- **No presentation scoring.** The original spec listed it as a future feature and it stays future. Scoring a spoken minute properly needs audio capture and a model call, which means a backend and a privacy story this version deliberately doesn't have.
-- **No spin-wheel mode.** The dial already carries the drawing animation; a second randomiser would compete with it.
-- **Single file by design.** At ~65 KB it loads in one request. If it grows past a few hundred KB, split the corpus into its own `topics.js` before splitting anything else.
+- Replace `hello@example.com` in `src/app/contact/page.js`.
+- Check the governing-law clause in `src/app/terms/page.js` (currently Texas).
+- Set both env vars in Vercel, and run the migration + turn off email confirmation in Supabase.
 
 ## Licence
 
