@@ -4,7 +4,7 @@ Draw a topic you didn't choose. Research it, write it in your own words, present
 
 Built by Matthew Sinitiere.
 
-**v2.0.0** — Next.js + Supabase + Stripe. Free to practise; accounts (email + username + password) get a 7-day trial then $3/month for up to three graded takes a day. Recording → Whisper → GPT-4o mini grade A+ to F with filler-word counts and pointers, all on the site's own OpenAI key behind authenticated API routes. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
+**v2.0.0** — Next.js + Supabase. Free to practise; accounts (email + username + password) get up to three graded takes a day, free while in beta. Recording → Whisper → GPT-4o mini grade A+ to F with filler-word counts and pointers, all on the site's own OpenAI key behind authenticated API routes. Stripe billing (7-day trial, $3/month) is built and switched off behind `NEXT_PUBLIC_BILLING`. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -12,7 +12,7 @@ Built by Matthew Sinitiere.
 
 ```bash
 npm install
-cp .env.local.example .env.local   # fill in Supabase, OpenAI and Stripe values
+cp .env.local.example .env.local   # fill in Supabase and OpenAI values
 npm run dev                        # -> http://localhost:3000
 ```
 
@@ -26,15 +26,15 @@ Without the public Supabase values the app runs as a guest-only site: drawing, n
    The built-in email sender is rate-limited (a handful an hour) and often lands in spam. Fine for testing; add custom SMTP under **Authentication → SMTP** before real users.
 4. **Project Settings → API Keys** → the publishable key goes in `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe; RLS locks every table to its owner) and the **secret / service_role** key goes in `SUPABASE_SERVICE_ROLE_KEY` (server only — it bypasses RLS and must never be prefixed `NEXT_PUBLIC_`).
 
-## Set up OpenAI and Stripe (once)
+## Set up OpenAI (and, later, Stripe)
 
 1. **OpenAI**: create a key at platform.openai.com with a monthly spend limit set, and put it in `OPENAI_API_KEY`. Every user's recording is graded on this key.
-2. **Stripe**: `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup.mjs` creates the product and the $3/month price and prints `STRIPE_PRICE_ID`. Then in the dashboard: **Developers → Webhooks → Add endpoint** `https://<your-domain>/api/billing/webhook` with the events the script lists, and copy its signing secret to `STRIPE_WEBHOOK_SECRET`. Enable **Settings → Tax → Stripe Tax** (or set `STRIPE_TAX=0`) and **Settings → Billing → Customer portal** (allow cancel + update payment method). Repeat with `sk_live_` when you go live.
+2. **Stripe (only when turning billing on)**: set `NEXT_PUBLIC_BILLING=1`, then `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup.mjs` creates the product and the $3/month price and prints `STRIPE_PRICE_ID`. Then in the dashboard: **Developers → Webhooks → Add endpoint** `https://<your-domain>/api/billing/webhook` with the events the script lists, and copy its signing secret to `STRIPE_WEBHOOK_SECRET`. Enable **Settings → Tax → Stripe Tax** (or set `STRIPE_TAX=0`) and **Settings → Billing → Customer portal** (allow cancel + update payment method). Repeat with `sk_live_` when you go live.
 3. Local webhooks: `stripe listen --forward-to localhost:3000/api/billing/webhook` and use the `whsec_` it prints.
 
 ## Deploy it
 
-Vercel, connected to this repository, builds on every push. Add every variable from `.env.local.example` in **Vercel → Project → Settings → Environment Variables** for Production and Preview (use Stripe test keys on Preview). `/api/analyze` declares `maxDuration = 60` because Whisper plus grading takes 15–30 s; Vercel Hobby allows this.
+Vercel, connected to this repository, builds on every push. Add the Supabase and OpenAI variables from `.env.local.example` in **Vercel → Project → Settings → Environment Variables** for Production and Preview (Stripe ones only once billing is on). `/api/analyze` declares `maxDuration = 60` because Whisper plus grading takes 15–30 s; Vercel Hobby allows this.
 
 ## What's in the box
 
@@ -71,20 +71,22 @@ public/                  favicon.svg, robots.txt
 
 ## How recording works
 
-1. **Record the minute** needs a signed-in user with an active plan (trialing or active in `subscriptions`) and fewer than three takes counted today in `usage`. Otherwise the button opens the sign-in or subscribe modal.
+1. **Record the minute** needs a signed-in user with fewer than three takes counted today in `usage` (and, when billing is on, an active plan in `subscriptions`). Otherwise the button opens the sign-in or subscribe modal.
 2. `MediaRecorder` captures the mic at 48 kbps (`webm/opus`, falling back to `mp4` on Safari) while the sixty-second clock runs. Stopping early or the clock reaching zero ends the take.
 3. The blob is POSTed to **`/api/analyze`** with the Supabase access token. The route verifies the token with the service-role client, re-checks the plan and the cap, and calls `bump_usage()` — an atomic insert-or-increment that refuses once today's count reaches three, so parallel requests cannot slip past it. Only then does it upload the audio to Whisper and the transcript to `gpt-4o-mini` on **`OPENAI_API_KEY`**. On failure the take is given back. Audio is never stored.
 4. The result is written to `speeches` (service role; the browser has no insert policy) with `version` = earlier takes on that topic + 1, and returned to `AnalysisPanel`.
 
 ### Economics
 
-Per graded minute ≈ $0.006 Whisper + ~$0.001 grading ≈ **0.7¢**. Stripe keeps ~$0.39 of each $3, so a subscriber nets ~$2.61 and breaks even at ~370 takes a month; the 3-a-day cap makes the worst case ~93 takes ≈ 65¢. Set a spend limit on the OpenAI key anyway.
+Per graded minute ≈ $0.006 Whisper + ~$0.001 grading ≈ **0.7¢**; the 3-a-day cap makes a user's worst case ~93 takes ≈ 65¢ a month. Free during the beta. If billing is switched on at $3/month, Stripe keeps ~$0.39, so a subscriber nets ~$2.61 and breaks even at ~370 takes. Set a spend limit on the OpenAI key regardless.
 
 ### Grading dimensions
 
 `clarity`, `structure`, `accuracy`, `delivery` (1–10), `grade` (A+…F), `summary`, `strengths[]`, `improvements[]`, plus computed `wordCount`, `fillerTotal`, `fillers{}`, `durationSeconds`, `wpm`. The rubric lives in `src/lib/openai.js` as `RUBRIC`; edit it there. Changing it changes future grades only.
 
-## Billing model
+## Billing model (dormant)
+
+`NEXT_PUBLIC_BILLING` is unset, so `computeEntitlement()` returns `active` for every signed-in user and the checkout/portal routes answer 404. The Plan panel shows "Free". Set it to `1` with the Stripe variables to enable everything below unchanged.
 
 - Checkout is Stripe-hosted, subscription mode, `trial_period_days: 7`, `payment_method_collection: always`, `automatic_tax` on. Success returns to `/settings?checkout=success`, which polls the plan for ~12 s while the webhook lands.
 - The webhook mirrors every subscription event into `subscriptions` (`status`, `trial_end`, `current_period_end`, `cancel_at_period_end`); the row is the only thing the app reads. A missing or unknown status means no plan.
@@ -138,10 +140,10 @@ Suppressed while typing in a field.
 
 ## Before going live
 
-- Set every env var in Vercel (live Stripe keys on Production).
+- Set the Supabase and OpenAI env vars in Vercel.
 - Run all four migrations; set Site URL and Redirect URLs in Supabase; consider custom SMTP.
-- Create the live Stripe webhook and enable Stripe Tax + the customer portal.
 - Put a monthly spend limit on the OpenAI key.
+- When turning billing on: Stripe keys, webhook, Stripe Tax, customer portal, `NEXT_PUBLIC_BILLING=1`, and revisit the copy on how/terms/privacy/mission/about.
 - Contact email (`src/app/contact/page.js`) and governing law (`src/app/terms/page.js`, Texas) are set; change them if either moves.
 
 ## Licence

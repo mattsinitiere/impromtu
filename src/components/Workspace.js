@@ -65,7 +65,7 @@ export default function Workspace({ current, open, timer, recording, busy, plan,
           {recording ? (
             <button className="btn recording" onClick={onStopRecording}><span className="rec-dot" />Stop recording</button>
           ) : (
-            <button className="btn btn--primary" onClick={onRecord} disabled={busy || timer.running}>{Mic}{plan && !plan.active ? (plan.status ? "Subscribe to record" : "Record the minute · free trial") : plan && plan.remaining <= 0 ? "Recorded 3 today" : timer.finished ? "Record another take" : "Record the minute"}</button>
+            <button className="btn btn--primary" onClick={onRecord} disabled={busy || timer.running}>{Mic}{plan && !plan.active ? (plan.status ? "Subscribe to record" : "Record the minute · free trial") : plan && plan.remaining <= 0 ? `Recorded ${plan.cap} today` : timer.finished ? "Record another take" : "Record the minute"}</button>
           )}
           <button className="btn" onClick={onStartTimer} disabled={recording || busy}>{timer.running ? Pause : Play}{startLabel}</button>
           <button className="btn btn--ghost" onClick={onReset} disabled={(!timer.started && !timer.finished) || recording || busy}>{Stop}Reset</button>

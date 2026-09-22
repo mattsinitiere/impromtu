@@ -214,13 +214,14 @@ export function StoreProvider({ children }) {
 
   async function exportData() {
     if (!sb || !user) return null;
-    const [{ data: prof }, { data: settings }, { data: speeches }, { data: sub }] = await Promise.all([
+    const [{ data: prof }, { data: settings }, { data: speeches }, { data: sub }, { data: usage }] = await Promise.all([
       sb.from("profiles").select("id, username, display_name, created_at").eq("id", user.id).maybeSingle(),
       sb.from("user_settings").select("*").eq("user_id", user.id).maybeSingle(),
       sb.from("speeches").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       sb.from("subscriptions").select("status, trial_end, current_period_end, cancel_at_period_end").eq("user_id", user.id).maybeSingle(),
+      sb.from("usage").select("day, takes").eq("user_id", user.id),
     ]);
-    return { exported_at: new Date().toISOString(), account: { email: user.email, created_at: user.created_at }, profile: prof, plan: sub, settings, speeches: speeches || [] };
+    return { exported_at: new Date().toISOString(), account: { email: user.email, created_at: user.created_at }, profile: prof, plan: sub, usage: usage || [], settings, speeches: speeches || [] };
   }
 
   async function deleteAccount() {

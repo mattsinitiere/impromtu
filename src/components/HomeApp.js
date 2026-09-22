@@ -249,7 +249,7 @@ export default function HomeApp() {
         <div className="modal-bg" onClick={() => setSigninModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Create an account to record</h3>
-            <p>{hasAccounts ? "Graded speeches are saved to your account so you can watch them improve. It takes an email, a username and a password; the first week is free. Drawing topics and running the clock work without one." : "This deployment has no account backend configured, so recording is unavailable."}</p>
+            <p>{hasAccounts ? "Graded speeches are saved to your account so you can watch them improve. It takes an email, a username and a password, and it is free while Impromptu is in beta. Drawing topics and running the clock work without one." : "This deployment has no account backend configured, so recording is unavailable."}</p>
             <div className="acts">
               <button className="btn btn--ghost" onClick={() => setSigninModal(false)}>Not now</button>
               {hasAccounts && <Link className="btn" href="/login">Log in</Link>}

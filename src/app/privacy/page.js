@@ -10,7 +10,7 @@ export default function Privacy() {
       <p className="stamp">Effective 22 September 2026 · Version 2.0.0</p>
 
       <div className="callout">
-        <p><strong>The short version.</strong> One email address if you make an account, and only to confirm it and reset the password. No phone number, no tracking cookies, no analytics, no advertising. As a guest, everything stays in your browser. With an account, your notes and graded speeches are stored in a database you can export or delete in one click. When you press Record, that audio goes to OpenAI for transcription and grading — and only then. Card details go to Stripe and never touch us.</p>
+        <p><strong>The short version.</strong> One email address if you make an account, and only to confirm it and reset the password. No phone number, no tracking cookies, no analytics, no advertising. As a guest, everything stays in your browser. With an account, your notes and graded speeches are stored in a database you can export or delete in one click. When you press Record, that audio goes to OpenAI for transcription and grading — and only then. No payment details are collected.</p>
       </div>
 
       <h2>Using it as a guest</h2>
@@ -23,15 +23,13 @@ export default function Privacy() {
       <ul>
         <li>Your login: email address and a hashed password (never the password itself)</li>
         <li>Your profile: username and display name</li>
-        <li>Your plan: Stripe customer and subscription IDs, plan status and renewal date, and a count of graded takes per day. Not your card number, which only Stripe holds.</li>
+        <li>A count of graded takes per day, to enforce the daily limit</li>
         <li>Your settings, notes, checklist ticks, topic history and saved topics (so they follow you between devices)</li>
         <li>Every graded speech: topic, transcript, the analysis and grade, word count, duration and date</li>
       </ul>
       <p><strong>Audio is never stored.</strong> The recording exists in your browser's memory only for as long as it takes to transcribe it, and is then discarded.</p>
       <p>Data lives in a Supabase project (Postgres, hosted in the United States) protected by row-level security, so each account can only ever read its own rows. Supabase's handling is governed by the <a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase Privacy Policy</a>.</p>
-      <h3>Payments</h3>
-      <p>Checkout, card storage, invoices and the billing portal are all Stripe. We receive your Stripe customer ID, the plan status and, for tax purposes, the country of your billing address. See the <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe Privacy Policy</a>.</p>
-      <h3>Exporting and deleting</h3>
+            <h3>Exporting and deleting</h3>
       <p><strong>Download my data</strong> (in <Link href="/settings">Settings</Link> and the footer) gives you everything above as one JSON file. <strong>Delete account</strong> removes your login and every row attached to it immediately and irreversibly. Individual speeches can be deleted from the Speeches page.</p>
 
       <h2>What leaves your device</h2>
@@ -46,7 +44,7 @@ export default function Privacy() {
 
       <h2>What is never collected</h2>
       <ul>
-        <li>Phone numbers, real names, or card numbers (Stripe holds those)</li>
+        <li>Phone numbers, real names or payment details</li>
         <li>Audio recordings, beyond the seconds needed to transcribe them</li>
         <li>Behavioural, advertising or analytics profiles of any kind</li>
       </ul>

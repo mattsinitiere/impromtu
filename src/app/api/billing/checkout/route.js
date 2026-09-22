@@ -1,6 +1,6 @@
 import { supabaseAdmin, userFromRequest, json, fail, route } from "@/lib/server/admin";
 import { stripe, customerFor } from "@/lib/server/stripe";
-import { TRIAL_DAYS } from "@/lib/entitlement";
+import { TRIAL_DAYS, BILLING } from "@/lib/entitlement";
 
 export const runtime = "nodejs";
 
@@ -8,6 +8,7 @@ export const runtime = "nodejs";
    mode with a 7-day trial. Stripe collects the card and billing address
    (for tax) and bills $3 on day 8 unless cancelled. */
 export const POST = route(async (req) => {
+  if (!BILLING) return fail("disabled", "Billing is not enabled on this deployment.", 404);
   const user = await userFromRequest(req);
   if (!user) return fail("auth", "Sign in first.", 401);
   const price = process.env.STRIPE_PRICE_ID;

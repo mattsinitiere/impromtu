@@ -18,11 +18,11 @@ export default function Terms() {
       <h2>3. Accounts</h2>
       <p>An account is an email address you confirm, a public username and a password. You are responsible for keeping the password safe; it can be reset by email. One person per account. Do not pick a username that impersonates someone else. Accounts that abuse the service or the third-party APIs it depends on may be removed.</p>
 
-      <h2>4. Plans, trials and payment</h2>
-      <p>Drawing topics, notes and the timer are free and need no account. Recording and grading require a plan: a seven-day free trial that needs a valid card, then <strong>US$3 per month</strong> plus any applicable tax, billed in advance by Stripe, until cancelled. Cancel at any time from Settings; recording continues to the end of the period already paid for and no further charges are made. Because the service is delivered immediately, payments are not refunded except where the law requires it or the service was unavailable for a substantial part of the period — write to the contact page and it will be looked at fairly. One free trial per person. Plans are limited to <strong>three graded takes per calendar day (UTC)</strong>, a fair-use limit that keeps the price where it is. Prices may change with at least thirty days' notice by email; continuing past the change date accepts the new price. Payment details are held by <a href="https://stripe.com/legal/consumer" target="_blank" rel="noopener">Stripe</a>, never by Impromptu.</p>
+      <h2>4. Cost and limits</h2>
+      <p>Drawing topics, notes and the timer are free and need no account. Recording and grading require an account and are <strong>free during the beta</strong>, limited to <strong>three graded takes per calendar day (UTC)</strong>. Because each graded minute costs real money, a paid plan may be introduced later; if so you will be told by email at least thirty days before anything is charged, and nothing will ever be charged without you choosing to subscribe. One account per person.</p>
 
       <h2>5. Availability</h2>
-      <p>Impromptu is a personal project: it may be changed, moved or taken offline. If it is discontinued, active subscriptions will be cancelled and unused time refunded. Export your data if you want a copy you control.</p>
+      <p>Impromptu is a personal project: it may be changed, moved or taken offline at any time without notice. Export your data if you want a copy you control.</p>
 
       <h2>6. Licence</h2>
       <p>The source code is released under the MIT licence. You may use, copy, modify, distribute and sell it, including commercially, provided the copyright notice and licence text are retained. Full text is in the <a href="https://github.com/mattsinitiere/impromtu/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE file</a>.</p>
@@ -37,13 +37,13 @@ export default function Terms() {
       </div>
 
       <h2>9. Acceptable use</h2>
-      <p>Do not use Impromptu to break the law, to record anyone without their consent, to share an account, to create multiple accounts to repeat the free trial, or to disrupt the site or the services it depends on. Do not script the recording endpoint. Accounts that do may be closed without refund.</p>
+      <p>Do not use Impromptu to break the law, to record anyone without their consent, to share an account, to create multiple accounts to get around the daily limit, or to disrupt the site or the services it depends on. Do not script the recording endpoint. Accounts that do may be closed.</p>
 
       <h2>10. No warranty</h2>
       <p>Impromptu is provided <strong>"as is", without warranty of any kind</strong>, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose and non-infringement. There is no guarantee that it will be available, error-free, accurate, or that stored data will persist.</p>
 
       <h2>11. Limitation of liability</h2>
-      <p>To the maximum extent permitted by law, the author is not liable for any indirect, incidental, special, consequential or exemplary damages arising from your use of or inability to use Impromptu — including lost notes or speeches, lost time, or any consequence of relying on a definition or grade it displayed. In any event, total liability is limited to the amount you paid in the three months before the claim.</p>
+      <p>To the maximum extent permitted by law, the author is not liable for any indirect, incidental, special, consequential or exemplary damages arising from your use of or inability to use Impromptu — including lost notes or speeches, lost time, or any consequence of relying on a definition or grade it displayed. In any event, total liability is limited to the amount you paid in the three months before the claim, which during the beta is nothing.</p>
 
       <h2>12. Changes to these terms</h2>
       <p>These terms may be revised. The effective date above will change, and every revision is visible in the project's commit history. Continuing to use the application after a change means you accept the revised terms.</p>

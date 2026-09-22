@@ -9,11 +9,11 @@ The single-file static app became a Next.js application with an optional
 account and a graded speech recorder.
 
 ### Added
-- **Plans.** Practising is free. Recording and grading need a plan: a 7-day
-  free trial (card required, via Stripe Checkout with Stripe Tax), then $3 a
-  month, capped at three graded takes per UTC day. Manage, cancel and download
-  invoices from Stripe's portal in Settings. Deleting an account cancels the
-  subscription first.
+- **Free during beta, three graded takes a day.** Recording needs a confirmed
+  account; the per-UTC-day cap is enforced atomically server-side. Stripe
+  billing (7-day card-required trial, $3/month, Stripe Tax, portal, webhook
+  mirroring, cancel-on-delete) is implemented but off behind
+  `NEXT_PUBLIC_BILLING`.
 - **Server-side grading.** Audio goes to `/api/analyze`, which verifies the
   session, the plan and the daily cap atomically, then calls OpenAI on the
   site's own key. Users no longer supply an API key or choose a model.
@@ -33,9 +33,9 @@ account and a graded speech recorder.
   Backed by Supabase Auth; a database trigger creates the profile row; row-
   level security on every table. Guest state carries into a new account on
   first sign-in.
-- **Settings page.** Plan status and billing, display name, password, theme,
+- **Settings page.** Plan and today's count, display name, password, theme,
   **Download my data** (one JSON file) and **Delete account** (immediate,
-  cascading, cancels billing).
+  cascading).
 - **Real URLs.** `/how`, `/categories`, `/about`, `/mission`, `/privacy`,
   `/terms`, `/contact`, `/login`, `/signup`, `/forgot-password`,
   `/reset-password`, `/settings`, `/speeches`.

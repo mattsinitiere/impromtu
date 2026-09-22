@@ -8,7 +8,7 @@ move between sections as the shape of the thing becomes clearer.
 
 - Accounts (email + username + password, confirmed email, reset by email), Supabase backend
 - Record the minute, Whisper transcription, GPT grading A+ → F, on the site's key
-- 7-day trial then $3/month via Stripe, 3 graded takes a day
+- Free during beta, 3 graded takes a day (Stripe billing built, switched off)
 - Filler-word counting, four scored dimensions, strengths and pointers
 - Speech history with takes per topic, re-record, delete, export, delete account
 
@@ -31,6 +31,8 @@ if the number is fair.
 - [ ] **Progress dashboard.** Grades over time, filler words per take trending
       down (or not), which fields you dodge, which you score best in.
 - [ ] **Streaks and a weekly rhythm**, quietly. A dot per day, no notifications.
+- [ ] **Turn billing on** once the grade is trusted: 7-day trial then $3/month
+      (already built behind `NEXT_PUBLIC_BILLING`).
 - [ ] **A higher tier.** More takes a day and GPT-4o grading for people who
       practise seriously, priced to stay profitable at the cap.
 - [ ] **Custom topic pools.** Paste your own list (interview prep, a syllabus,
