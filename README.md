@@ -1,106 +1,130 @@
 # Impromptu
 
-Draw a topic you didn't choose. Research it, write it in your own words, present it for one minute.
+Draw a topic you didn't choose. Research it, write it in your own words, present it for one minute — then get it graded.
 
 Built by Matthew Sinitiere.
 
-**v1.0.0** — one HTML file, no build step, no dependencies, no tracking.
+**v2.0.0** — Next.js + Supabase. Free to practise; accounts (email + username + password) get up to three graded takes a day, free while in beta. Recording → Whisper → GPT-4o mini grade A+ to F with filler-word counts and pointers, all on the site's own OpenAI key behind authenticated API routes. Stripe billing (7-day trial, $3/month) is built and switched off behind `NEXT_PUBLIC_BILLING`. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
 
 ---
 
-## Run it
-
-Double-click `index.html`. That's the whole install.
-
-To serve it locally (needed if you want the favicon and font requests to behave exactly as they will in production):
+## Run it locally
 
 ```bash
-python3 -m http.server 8000
-# -> http://localhost:8000
+npm install
+cp .env.local.example .env.local   # fill in Supabase and OpenAI values
+npm run dev                        # -> http://localhost:3000
 ```
+
+Without the public Supabase values the app runs as a guest-only site: drawing, notes and the clock work; log in, sign up and recording are disabled with a clear message. Without the server values, sign-in works but recording and checkout return a clear configuration error.
+
+## Set up Supabase (once)
+
+1. Create a project at [supabase.com](https://supabase.com). Free tier is fine.
+2. **SQL Editor** → paste and run each file in `supabase/migrations/` in order (`0001` → `0004`). It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, three small functions (`username_taken`, `delete_own_account`, `handle_new_user`) and the trigger that creates a profile row for each new auth user.
+3. **Authentication → Sign In / Providers → Email** → leave **"Confirm email" on** (the default). Then **Authentication → URL Configuration**: set *Site URL* to your production URL and add these *Redirect URLs*: `https://<your-domain>/**`, `https://*-<your-vercel-team>.vercel.app/**` (previews), `http://localhost:3000/**`. Confirmation and reset links redirect to `/login?confirmed=1` and `/reset-password`; if a URL isn't on that list Supabase falls back to the Site URL.
+   The built-in email sender is rate-limited (a handful an hour) and often lands in spam. Fine for testing; add custom SMTP under **Authentication → SMTP** before real users.
+4. **Project Settings → API Keys** → the publishable key goes in `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe; RLS locks every table to its owner) and the **secret / service_role** key goes in `SUPABASE_SERVICE_ROLE_KEY` (server only — it bypasses RLS and must never be prefixed `NEXT_PUBLIC_`).
+
+## Set up OpenAI (and, later, Stripe)
+
+1. **OpenAI**: create a key at platform.openai.com with a monthly spend limit set, and put it in `OPENAI_API_KEY`. Every user's recording is graded on this key.
+2. **Stripe (only when turning billing on)**: set `NEXT_PUBLIC_BILLING=1`, then `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup.mjs` creates the product and the $3/month price and prints `STRIPE_PRICE_ID`. Then in the dashboard: **Developers → Webhooks → Add endpoint** `https://<your-domain>/api/billing/webhook` with the events the script lists, and copy its signing secret to `STRIPE_WEBHOOK_SECRET`. Enable **Settings → Tax → Stripe Tax** (or set `STRIPE_TAX=0`) and **Settings → Billing → Customer portal** (allow cancel + update payment method). Repeat with `sk_live_` when you go live.
+3. Local webhooks: `stripe listen --forward-to localhost:3000/api/billing/webhook` and use the `whsec_` it prints.
 
 ## Deploy it
 
-Any static host. Drop the folder in and you're done.
-
-```bash
-npx vercel deploy --prod     # Vercel
-npx netlify deploy --prod    # Netlify
-```
-
-GitHub Pages: push the folder to a repo, then Settings -> Pages -> deploy from branch root.
+Vercel, connected to this repository, builds on every push. Add the Supabase and OpenAI variables from `.env.local.example` in **Vercel → Project → Settings → Environment Variables** for Production and Preview (Stripe ones only once billing is on). `/api/analyze` declares `maxDuration = 60` because Whisper plus grading takes 15–30 s; Vercel Hobby allows this.
 
 ## What's in the box
 
 ```
-index.html      the entire application - markup, styles, logic, topic corpus
-mission.html    why it exists and how to use it
-privacy.html    what is stored, what is sent, how to delete it
-terms.html      MIT licence, no warranty, third-party content
-contact.html    bug reports, topic suggestions, email
-page.css        shared stylesheet for the four pages above
-favicon.svg     wordmark favicon
-robots.txt      crawler policy (add your sitemap once the domain is live)
-README.md       this file
-CHANGELOG.md    release notes
-LICENSE         MIT
-.editorconfig   two-space indents, LF, UTF-8
-.gitignore      OS, editor and host artefacts
+src/app/                 routes (App Router). One folder per URL.
+  layout.js              header, footer, toast, theme, store provider
+  page.js                the app: hero, dial, topic card, workspace, recorder
+  login/ signup/ forgot-password/ reset-password/ settings/ speeches/
+  how/ categories/ about/ mission/ privacy/ terms/ contact/
+  api/analyze            POST audio → transcript → grade → speeches row (auth, plan, cap)
+  api/billing/checkout   POST → Stripe Checkout URL (7-day trial, card required)
+  api/billing/portal     POST → Stripe billing portal URL
+  api/billing/webhook    POST from Stripe → mirrors subscription status
+  api/account/delete     POST → cancels subscription, deletes auth user
+  globals.css            design tokens and every style; light/dark via [data-theme]
+src/components/          Header, Footer, Toast, Dial, TopicCard, Workspace, Library,
+                         HomeApp, AuthForm, PasswordForms, SettingsPanel, SpeechHistory,
+                         AnalysisPanel, SubscribeModal
+src/lib/
+  topics.js              the corpus (RAW), CATS/FLAT, pick/pool/daily helpers
+  store.js               React context: guest state in localStorage, signed-in
+                         state mirrored to user_settings; auth actions
+  supabase.js            browser client (implicit flow so email links work cross-device)
+  entitlement.js         the one rule for 'may this user record now' (client + server)
+  utils.js               time formatting, Wikipedia lookup, chime, JSON download
+  server/admin.js        service-role client + bearer-token verification (server only)
+  server/openai.js       Whisper + chat completions; the grading rubric (server only)
+  server/stripe.js       Stripe client, customer lookup, subscription mirroring
+scripts/stripe-setup.mjs one-time product + price creation
+src/hooks/               useTimer, useRecorder
+supabase/migrations/     schema + RLS, run by hand in the SQL editor
+public/                  favicon.svg, robots.txt
 ```
 
-`index.html` stays self-contained and does not use `page.css`. The four standalone
-pages share it, and each inherits the theme the reader picked in the app by
-reading the same `localStorage` key.
+## How recording works
 
-### Before going live
+1. **Record the minute** needs a signed-in user with fewer than three takes counted today in `usage` (and, when billing is on, an active plan in `subscriptions`). Otherwise the button opens the sign-in or subscribe modal.
+2. `MediaRecorder` captures the mic at 48 kbps (`webm/opus`, falling back to `mp4` on Safari) while the sixty-second clock runs. Stopping early or the clock reaching zero ends the take.
+3. The blob is POSTed to **`/api/analyze`** with the Supabase access token. The route verifies the token with the service-role client, re-checks the plan and the cap, and calls `bump_usage()` — an atomic insert-or-increment that refuses once today's count reaches three, so parallel requests cannot slip past it. Only then does it upload the audio to Whisper and the transcript to `gpt-4o-mini` on **`OPENAI_API_KEY`**. On failure the take is given back. Audio is never stored.
+4. The result is written to `speeches` (service role; the browser has no insert policy) with `version` = earlier takes on that topic + 1, and returned to `AnalysisPanel`.
 
-- **Replace the contact email.** `contact.html` ships with `hello@example.com`.
-- **Confirm the repository URL.** Every page links to
-  `https://github.com/mattsinitiere/impromtu` — note the spelling.
-- **Check the governing-law clause** in `terms.html`; it currently names Texas.
+### Economics
 
-There is no `package.json` and no toolchain. Nothing here compiles, bundles or
-installs — what you edit is what ships.
+Per graded minute ≈ $0.006 Whisper + ~$0.001 grading ≈ **0.7¢**; the 3-a-day cap makes a user's worst case ~93 takes ≈ 65¢ a month. Free during the beta. If billing is switched on at $3/month, Stripe keeps ~$0.39, so a subscriber nets ~$2.61 and breaks even at ~370 takes. Set a spend limit on the OpenAI key regardless.
+
+### Grading dimensions
+
+`clarity`, `structure`, `accuracy`, `delivery` (1–10), `grade` (A+…F), `summary`, `strengths[]`, `improvements[]`, plus computed `wordCount`, `fillerTotal`, `fillers{}`, `durationSeconds`, `wpm`. The rubric lives in `src/lib/openai.js` as `RUBRIC`; edit it there. Changing it changes future grades only.
+
+## Billing model (dormant)
+
+`NEXT_PUBLIC_BILLING` is unset, so `computeEntitlement()` returns `active` for every signed-in user and the checkout/portal routes answer 404. The Plan panel shows "Free". Set it to `1` with the Stripe variables to enable everything below unchanged.
+
+- Checkout is Stripe-hosted, subscription mode, `trial_period_days: 7`, `payment_method_collection: always`, `automatic_tax` on. Success returns to `/settings?checkout=success`, which polls the plan for ~12 s while the webhook lands.
+- The webhook mirrors every subscription event into `subscriptions` (`status`, `trial_end`, `current_period_end`, `cancel_at_period_end`); the row is the only thing the app reads. A missing or unknown status means no plan.
+- `computeEntitlement()` in `src/lib/entitlement.js` is the single rule: `trialing` or `active`, and the period end (plus 24 h grace for webhook lag) is in the future. Both the Record button and `/api/analyze` use it.
+- One trial per Stripe customer: a returning customer's checkout skips the trial.
+- Deleting an account cancels the subscription first (`/api/account/delete`); if Stripe refuses, the account is not deleted and the user is told.
+
+## Auth model
+
+Email + password via Supabase Auth, with the email confirmed before first login. The username is the public handle and is passed as sign-up metadata; the `on_auth_user_created` trigger (`handle_new_user()`) turns it into a `profiles` row the moment the auth user exists, which is what lets the browser stay out of the loop until the email is confirmed.
+
+- Confirmation link → `/login?confirmed=1` with the session in the URL fragment (implicit flow), so it works in whatever browser the email is opened in; the page notices it is signed in and goes home.
+- **Forgot password** → `/forgot-password` sends a reset link → `/reset-password` sets the new one via `auth.updateUser`. Settings also has a change-password field.
+- Username uniqueness is enforced twice: by `profiles.username unique` and, before signup, by `username_taken()` (security definer, so it works for anonymous callers).
+- Account deletion goes through `/api/account/delete` (cancel Stripe, then `auth.admin.deleteUser`); everything else cascades.
+- Guest state is copied into `user_settings` on the first sign-in that finds no row.
 
 ## The topic corpus
 
 1,117 topics across 107 fields, each tagged `1` beginner, `2` intermediate, `3` advanced.
 
-Find `const RAW = [` in `index.html`. The format is one string per field:
+`src/lib/topics.js`, `RAW`. One string per field:
 
 ```
 "Field Name|Topic One~1|Topic Two~3|Topic Three~2"
 ```
 
-To add a field, add a string. To add topics, append to an existing one. Everything downstream — the category picker, the counts on the Categories page, the daily topic, the filters — reads from this array, so nothing else needs touching.
+Add a string to add a field; append to one to add topics. The category page, the picker, the counts, the daily topic and the filters all read from it.
 
-Two rules that keep the pool worth drawing from:
+- **No `&`, `<` or `>` characters** in names.
+- **Timeless only.** If it won't be worth understanding in ten years, it doesn't belong.
 
-- **No `&`, `<` or `>` characters.** Topic names are written into the DOM as HTML.
-- **Timeless only.** If it won't be worth understanding in ten years, it doesn't belong. No news, no celebrities, no trivia.
+## Storage
 
-## Storage and theme
-
-State (theme, filters, history, saved topics, notes, checklists, cached definitions) lives in `localStorage` under the key `impromptu:v1`. There is no backend, no account, no analytics.
-
-Light mode is the default on a first visit. The site deliberately does not follow the operating system setting — if the reader picks dark, that choice sticks from then on.
-
-If you want state to sync across devices, replace the `store` object near the top of the script. It exposes only `get(key)` and `set(key, value)`, both async, so swapping in a call to your own API is a contained change.
-
-## Definitions
-
-When a topic lands, the app fetches a one-sentence definition from the Wikipedia
-REST API and shows it under the title. Lookups run in two steps: the topic name
-is tried as an article title first, then as a search query if that misses.
-Results are cached in `localStorage`, so a repeat topic is instant and offline.
-
-This is the only outbound request in the app apart from fonts, and it sends
-nothing but the topic name. If the request fails — offline, blocked, or the
-subject is filed under another name — the panel says so and offers a search link
-rather than showing nothing.
-
-To remove the dependency entirely, delete `loadDef`, `wikiLookup`, `wikiSummary`
-and the two calls to `loadDef()`. The rest of the app is unaffected.
+- Guest: one `localStorage` entry, `impromptu:v2` — theme, filters, history, saved, notes, checklist ticks, cached definitions.
+- Signed in: the same shape lands in `user_settings` (debounced), and `localStorage` mirrors it so the page paints before the round trip. The first sign-in copies guest state across.
+- Speeches: `speeches` table only, written by the server. Audio is discarded after transcription.
+- Plan: `subscriptions` and `usage`, written only by the server; readable by their owner.
 
 ## Keyboard
 
@@ -112,19 +136,15 @@ and the two calls to `loadDef()`. The rest of the app is unaffected.
 | `T` | Toggle light and dark |
 | `Esc` | Close the field picker |
 
-Shortcuts are suppressed while you're typing in the notes field.
+Suppressed while typing in a field.
 
-## Type
+## Before going live
 
-The wordmark and headings are Inter; the dial, labels and counters are JetBrains Mono. Both load from Google Fonts.
-
-If you'd rather not depend on that — for privacy, or for offline use — delete the three `<link>` tags in `<head>`. The stack falls back to SF Pro on macOS and Segoe UI Variable on Windows, which is a small visual change, not a broken one. To self-host instead, drop the woff2 files in a `fonts/` folder and add `@font-face` rules at the top of the `<style>` block.
-
-## Known limits
-
-- **No presentation scoring.** The original spec listed it as a future feature and it stays future. Scoring a spoken minute properly needs audio capture and a model call, which means a backend and a privacy story this version deliberately doesn't have.
-- **No spin-wheel mode.** The dial already carries the drawing animation; a second randomiser would compete with it.
-- **Single file by design.** At ~65 KB it loads in one request. If it grows past a few hundred KB, split the corpus into its own `topics.js` before splitting anything else.
+- Set the Supabase and OpenAI env vars in Vercel.
+- Run all four migrations; set Site URL and Redirect URLs in Supabase; consider custom SMTP.
+- Put a monthly spend limit on the OpenAI key.
+- When turning billing on: Stripe keys, webhook, Stripe Tax, customer portal, `NEXT_PUBLIC_BILLING=1`, and revisit the copy on how/terms/privacy/mission/about.
+- Contact email (`src/app/contact/page.js`) and governing law (`src/app/terms/page.js`, Texas) are set; change them if either moves.
 
 ## Licence
 
