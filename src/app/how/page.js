@@ -22,7 +22,7 @@ export default function How() {
       <div className="sec-hd" style={{ marginTop: 56 }}>
         <p className="eyebrow">What you need</p>
         <h2>An account and an OpenAI key.</h2>
-        <p>Drawing topics, the notes and the clock work for anyone. Recording and grading need a free account (a username and a password, nothing else) and your own OpenAI API key, which you are asked for the first time you press Record. Grading a minute costs about a cent, billed to you by OpenAI. <Link href="/privacy">What gets sent where</Link>.</p>
+        <p>Drawing topics, the notes and the clock work for anyone. Recording and grading need a free account (an email you confirm, a username and a password) and your own OpenAI API key, which you are asked for the first time you press Record. Grading a minute costs about a cent, billed to you by OpenAI. <Link href="/privacy">What gets sent where</Link>.</p>
       </div>
       <div className="row-actions"><Link className="btn btn--primary" href="/">Draw a topic</Link><Link className="btn" href="/signup">Create account</Link></div>
     </section>

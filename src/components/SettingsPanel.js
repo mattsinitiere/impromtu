@@ -7,7 +7,8 @@ import { looksLikeKey, GRADING_MODELS, DEFAULT_MODEL } from "@/lib/openai";
 import { downloadJSON } from "@/lib/utils";
 
 export default function SettingsPanel() {
-  const { S, setTheme, user, profile, hasAccounts, saveApiKey, updateDisplayName, updateProfile, exportData, deleteAccount, logout, toast, ready } = useStore();
+  const { S, setTheme, user, profile, hasAccounts, saveApiKey, updateDisplayName, updateProfile, updatePassword, exportData, deleteAccount, logout, toast, ready } = useStore();
+  const [pw, setPw] = useState("");
   const model = profile?.grading_model || DEFAULT_MODEL;
   const router = useRouter();
   const [key, setKey] = useState("");
@@ -54,7 +55,7 @@ export default function SettingsPanel() {
       <div className="page-hd">
         <p className="eyebrow">Settings</p>
         <h1>Your account.</h1>
-        <p>{user ? <>Signed in as <b>@{profile?.username}</b>.</> : "You are practising as a guest. Everything is saved in this browser only."}</p>
+        <p>{user ? <>Signed in as <b>@{profile?.username}</b> · {user.email}</> : "You are practising as a guest. Everything is saved in this browser only."}</p>
       </div>
 
       <div className="panel">
@@ -68,7 +69,7 @@ export default function SettingsPanel() {
       {ready && !user && hasAccounts && (
         <div className="panel">
           <div className="panel-hd"><h3>Account</h3></div>
-          <p className="sub">Create an account to record your minute, get it graded, and keep the history across devices. No email or phone number needed.</p>
+          <p className="sub">Create an account to record your minute, get it graded, and keep the history across devices. An email, a username and a password.</p>
           <div className="row-actions">
             <Link className="btn btn--primary" href="/signup">Create account</Link>
             <Link className="btn" href="/login">Log in</Link>
@@ -111,6 +112,14 @@ export default function SettingsPanel() {
           {msg.name && <div className="err">{msg.name}</div>}
         </form>
 
+        <form className="panel" onSubmit={(e) => { e.preventDefault(); setBusy("pw"); updatePassword(pw).then(() => { setPw(""); toast("Password changed."); }).catch((ex) => toast(ex.message)).finally(() => setBusy("")); }}>
+          <div className="panel-hd"><h3>Password</h3></div>
+          <div className="input-row">
+            <input className="input" type="password" autoComplete="new-password" placeholder="New password (8+ characters)" value={pw} onChange={(e) => setPw(e.target.value)} minLength={8} required />
+            <button className="btn" type="submit" disabled={busy === "pw"}>Change</button>
+          </div>
+        </form>
+
         <div className="panel">
           <div className="panel-hd"><h3>Your data</h3></div>
           <p className="sub">Everything Impromptu holds about you — profile, settings, notes, and every graded speech with its transcript — as one JSON file.</p>
@@ -122,7 +131,7 @@ export default function SettingsPanel() {
 
         <div className="panel danger">
           <div className="panel-hd"><h3>Delete account</h3></div>
-          <p className="sub">Removes your login, profile, settings and every speech. There is no recovery and no email to undo it from.</p>
+          <p className="sub">Removes your login, email, profile, settings and every speech, immediately. There is no undo.</p>
           {!confirm ? (
             <div className="row-actions"><button className="btn btn--danger" onClick={() => setConfirm(true)}>Delete my account…</button></div>
           ) : (

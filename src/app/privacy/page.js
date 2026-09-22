@@ -10,7 +10,7 @@ export default function Privacy() {
       <p className="stamp">Effective 22 September 2026 · Version 2.0.0</p>
 
       <div className="callout">
-        <p><strong>The short version.</strong> No email, no phone number, no cookies for tracking, no analytics, no advertising. As a guest, everything stays in your browser. With an account, your notes and graded speeches are stored in a database you can export or delete in one click. When you press Record, that audio goes to OpenAI on your own API key — and only then.</p>
+        <p><strong>The short version.</strong> One email address if you make an account, and only to confirm it and reset the password. No phone number, no tracking cookies, no analytics, no advertising. As a guest, everything stays in your browser. With an account, your notes and graded speeches are stored in a database you can export or delete in one click. When you press Record, that audio goes to OpenAI on your own API key — and only then.</p>
       </div>
 
       <h2>Using it as a guest</h2>
@@ -18,11 +18,11 @@ export default function Privacy() {
 
       <h2>With an account</h2>
       <h3>What we ask for</h3>
-      <p>A username, a display name and a password. Nothing else. There is no email address or phone number, which also means there is no password reset — keep the password somewhere safe.</p>
-      <p>Technically, the login system (Supabase Auth) requires an email-shaped identifier, so your username is stored internally as <code>username@impromptu.app</code>. That address does not exist and nothing is ever sent to it.</p>
+      <p>An email address, a username, a display name and a password. The email is used for exactly three things: the confirmation link when you sign up, password-reset links you request, and logging in. It is not shown to other users, not used for newsletters or marketing, and not shared with anyone except the email delivery service that sends those two kinds of message.</p>
       <h3>What is stored</h3>
       <ul>
-        <li>Your profile: username, display name, and the OpenAI API key you choose to save</li>
+        <li>Your login: email address and a hashed password (never the password itself)</li>
+        <li>Your profile: username, display name, grading model, and the OpenAI API key you choose to save</li>
         <li>Your settings, notes, checklist ticks, topic history and saved topics (so they follow you between devices)</li>
         <li>Every graded speech: topic, transcript, the analysis and grade, word count, duration and date</li>
       </ul>
@@ -45,7 +45,7 @@ export default function Privacy() {
 
       <h2>What is never collected</h2>
       <ul>
-        <li>Email addresses, phone numbers, real names or payment details</li>
+        <li>Phone numbers, real names or payment details</li>
         <li>Audio recordings, beyond the seconds needed to transcribe them</li>
         <li>Behavioural, advertising or analytics profiles of any kind</li>
       </ul>
@@ -54,10 +54,10 @@ export default function Privacy() {
       <p>Signed-in sessions are kept by the auth library in your browser's local storage, not in cookies. No tracking cookies are set.</p>
 
       <h2>Children</h2>
-      <p>Impromptu is not directed at children under 13 and does not knowingly collect information from them. Since no email or age is requested, we rely on you: if you are under 13, use it as a guest.</p>
+      <p>Impromptu is not directed at children under 13 and does not knowingly collect information from them. If you are under 13, use it as a guest. If you believe a child has created an account, use the contact page and it will be removed.</p>
 
       <h2>Your rights</h2>
-      <p>Access, portability, correction and erasure under regulations such as the GDPR and CCPA are satisfied by design: <em>Download my data</em>, editing your display name, and <em>Delete account</em> are all self-service and immediate. For anything else, use the <Link href="/contact">contact page</Link>.</p>
+      <p>Access, portability, correction and erasure under regulations such as the GDPR and CCPA are satisfied by design: <em>Download my data</em> (which includes your email), editing your display name and password, and <em>Delete account</em> are all self-service and immediate. For anything else, use the <Link href="/contact">contact page</Link>.</p>
 
       <h2>Changes</h2>
       <p>If this policy changes, the effective date above changes with it, and the edit is visible in the project's commit history on <a href="https://github.com/mattsinitiere/impromtu" target="_blank" rel="noopener">GitHub</a>.</p>

@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { supabase, usernameToEmail, USERNAME_RE } from "./supabase";
+import { supabase, siteOrigin, EMAIL_RE, USERNAME_RE } from "./supabase";
 
 /* ------------------------------------------------------------------
    One provider for auth + app state.
@@ -19,11 +19,19 @@ function readLocal() {
 }
 function writeLocal(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
 
+function settingsRow(uid, s) {
+  return {
+    user_id: uid, theme: s.theme, difficulty_filter: s.diff, category_filters: s.cats,
+    notes: s.notes, checks: s.checks, history: s.history, favs: s.favs, updated_at: new Date().toISOString(),
+  };
+}
+
 export function StoreProvider({ children }) {
   const [S, setS] = useState(EMPTY);
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);       // supabase auth user
   const [profile, setProfile] = useState(null); // profiles row
+  const [recovery, setRecovery] = useState(false); // arrived via a password-reset link
   const [toastMsg, setToastMsg] = useState("");
   const saveT = useRef(null);
   const toastT = useRef(null);
@@ -36,7 +44,7 @@ export function StoreProvider({ children }) {
     toastT.current = setTimeout(() => setToastMsg(""), 2800);
   }, []);
 
-  /* theme is applied to <html> so every page and the doc pages pick it up */
+  /* theme is applied to <html> so every page picks it up */
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", S.theme);
     const m = document.querySelector("meta[name=theme-color]");
@@ -49,17 +57,8 @@ export function StoreProvider({ children }) {
     if (!sb || !uid) return;
     clearTimeout(saveT.current);
     saveT.current = setTimeout(() => {
-      sb.from("user_settings").upsert({
-        user_id: uid,
-        theme: next.theme,
-        difficulty_filter: next.diff,
-        category_filters: next.cats,
-        notes: next.notes,
-        checks: next.checks,
-        history: next.history,
-        favs: next.favs,
-        updated_at: new Date().toISOString(),
-      }).then(({ error }) => { if (error) console.warn("settings sync failed", error.message); });
+      sb.from("user_settings").upsert(settingsRow(uid, next))
+        .then(({ error }) => { if (error) console.warn("settings sync failed", error.message); });
     }, 500);
   }, [sb]);
 
@@ -90,6 +89,10 @@ export function StoreProvider({ children }) {
         writeLocal(next);
         return next;
       });
+    } else {
+      // first sign-in on this account: carry the guest state across
+      const local = readLocal();
+      await sb.from("user_settings").upsert(settingsRow(u.id, local));
     }
   }, [sb]);
 
@@ -98,50 +101,69 @@ export function StoreProvider({ children }) {
     setS(readLocal());
     setReady(true);
     if (!sb) return;
-    let unsub = null;
     sb.auth.getSession().then(({ data }) => {
       const u = data.session ? data.session.user : null;
       setUser(u); loadProfile(u);
     });
-    const { data: sub } = sb.auth.onAuthStateChange((_ev, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((ev, session) => {
       const u = session ? session.user : null;
+      if (ev === "PASSWORD_RECOVERY") setRecovery(true);
       setUser(u); loadProfile(u);
     });
-    unsub = () => sub.subscription.unsubscribe();
-    return () => { if (unsub) unsub(); };
+    return () => sub.subscription.unsubscribe();
   }, [sb, loadProfile]);
 
   /* ---------- auth actions ---------- */
-  async function signup({ username, displayName, password }) {
+  async function signup({ email, username, displayName, password }) {
     if (!sb) throw new Error("Accounts are not configured on this deployment.");
+    const e = email.trim().toLowerCase();
     const u = username.trim().toLowerCase();
+    if (!EMAIL_RE.test(e)) throw new Error("Enter a valid email address.");
     if (!USERNAME_RE.test(u)) throw new Error("Username must be 3–20 characters: letters, numbers, underscores.");
     if (!displayName.trim()) throw new Error("Display name is required.");
     if (password.length < 8) throw new Error("Password must be at least 8 characters.");
     const { data: taken } = await sb.rpc("username_taken", { u });
     if (taken) throw new Error("That username is taken.");
     const { data, error } = await sb.auth.signUp({
-      email: usernameToEmail(u), password,
-      options: { data: { username: u, display_name: displayName.trim() } },
+      email: e, password,
+      options: {
+        data: { username: u, display_name: displayName.trim() },
+        emailRedirectTo: siteOrigin() + "/login?confirmed=1",
+      },
     });
     if (error) throw new Error(friendlyAuthError(error.message));
-    const uid = data.user && data.user.id;
-    if (!data.session) throw new Error("Sign-up needs email confirmation turned off in Supabase (Auth → Providers → Email).");
-    const { error: pErr } = await sb.from("profiles").insert({ id: uid, username: u, display_name: displayName.trim() });
-    if (pErr) throw new Error("Could not create profile: " + pErr.message);
-    // carry guest state across so nothing is lost
-    const local = readLocal();
-    await sb.from("user_settings").upsert({
-      user_id: uid, theme: local.theme, difficulty_filter: local.diff, category_filters: local.cats,
-      notes: local.notes, checks: local.checks, history: local.history, favs: local.favs,
-    });
-    await loadProfile(data.user);
+    // Supabase returns a user with an empty identities array when the email
+    // is already registered (to avoid leaking that fact). Treat it honestly.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error("That email already has an account. Log in, or reset the password.");
+    }
+    return { needsConfirmation: !data.session };
   }
 
-  async function login({ username, password }) {
+  async function login({ email, password }) {
     if (!sb) throw new Error("Accounts are not configured on this deployment.");
-    const { error } = await sb.auth.signInWithPassword({ email: usernameToEmail(username), password });
+    const { error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     if (error) throw new Error(friendlyAuthError(error.message));
+  }
+
+  async function resendConfirmation(email) {
+    if (!sb) return;
+    const { error } = await sb.auth.resend({ type: "signup", email: email.trim().toLowerCase(), options: { emailRedirectTo: siteOrigin() + "/login?confirmed=1" } });
+    if (error) throw new Error(friendlyAuthError(error.message));
+  }
+
+  async function requestPasswordReset(email) {
+    if (!sb) throw new Error("Accounts are not configured on this deployment.");
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: siteOrigin() + "/reset-password" });
+    if (error) throw new Error(friendlyAuthError(error.message));
+  }
+
+  async function updatePassword(password) {
+    if (!sb) throw new Error("Accounts are not configured on this deployment.");
+    if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw new Error(friendlyAuthError(error.message));
+    setRecovery(false);
   }
 
   async function logout() {
@@ -169,11 +191,11 @@ export function StoreProvider({ children }) {
   async function exportData() {
     if (!sb || !user) return null;
     const [{ data: prof }, { data: settings }, { data: speeches }] = await Promise.all([
-      sb.from("profiles").select("id, username, display_name, created_at").eq("id", user.id).maybeSingle(),
+      sb.from("profiles").select("id, username, display_name, grading_model, created_at").eq("id", user.id).maybeSingle(),
       sb.from("user_settings").select("*").eq("user_id", user.id).maybeSingle(),
       sb.from("speeches").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
     ]);
-    return { exported_at: new Date().toISOString(), profile: prof, settings, speeches: speeches || [] };
+    return { exported_at: new Date().toISOString(), account: { email: user.email, created_at: user.created_at }, profile: prof, settings, speeches: speeches || [] };
   }
 
   async function deleteAccount() {
@@ -187,8 +209,9 @@ export function StoreProvider({ children }) {
   }
 
   const value = {
-    S, update, ready, user, profile, toast, toastMsg,
-    signup, login, logout, saveApiKey, updateDisplayName, updateProfile, exportData, deleteAccount,
+    S, update, ready, user, profile, recovery, toast, toastMsg,
+    signup, login, logout, resendConfirmation, requestPasswordReset, updatePassword,
+    saveApiKey, updateDisplayName, updateProfile, exportData, deleteAccount,
     sb,
     setTheme: (t) => update({ theme: t }),
     hasAccounts: !!sb,
@@ -203,8 +226,10 @@ export function useStore() {
 }
 
 function friendlyAuthError(msg) {
-  if (/invalid login credentials/i.test(msg)) return "Wrong username or password.";
-  if (/already registered/i.test(msg)) return "That username is taken.";
-  if (/rate limit/i.test(msg)) return "Too many attempts. Wait a moment and try again.";
+  if (/invalid login credentials/i.test(msg)) return "Wrong email or password.";
+  if (/email not confirmed/i.test(msg)) return "Confirm your email first — check your inbox for the link.";
+  if (/already registered/i.test(msg)) return "That email already has an account.";
+  if (/rate limit|security purposes/i.test(msg)) return "Too many attempts. Wait a minute and try again.";
+  if (/same password/i.test(msg)) return "That is already your password.";
   return msg;
 }

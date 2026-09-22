@@ -6,7 +6,7 @@ move between sections as the shape of the thing becomes clearer.
 
 ## Shipped in v2.0
 
-- Accounts (username + password, no email), Supabase backend
+- Accounts (email + username + password, confirmed email, reset by email), Supabase backend
 - Record the minute, Whisper transcription, GPT grading A+ → F
 - Filler-word counting, four scored dimensions, strengths and pointers
 - Speech history with takes per topic, re-record, delete, export, delete account
@@ -37,14 +37,14 @@ if the number is fair.
 
 ## Profiles
 
-- [ ] Full profile: name, `@handle`, bio, optional email and phone (for
-      recovery only, never required), avatar.
+- [ ] Full profile: name, `@handle`, bio, optional phone, avatar.
 - [ ] **Tags next to the username**, Discord-style: earned ("100 minutes",
       "Clean take" for zero fillers, "Polymath" for 50 fields) and chosen
       ("Interview prep", "Toastmasters").
 - [ ] Public profile page, opt-in, showing what you choose: best grades,
       fields covered, streak. Private by default.
-- [ ] Password reset once an email or phone is on file.
+- [ ] Change the email on an account (with re-confirmation).
+- [ ] Custom SMTP (Resend or similar) so confirmation and reset mail is fast and lands in the inbox.
 
 ## Friends
 
@@ -100,6 +100,6 @@ The reason the grade has to be trustworthy first.
 ## Explicitly not planned
 
 - Advertising, analytics, or selling anything about the reader.
-- Requiring an email or phone number to use the core loop.
+- Requiring an account to use the core loop, or a phone number for anything.
 - A leaderboard among strangers by default. Competition is opt-in and among
   people you chose.

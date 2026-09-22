@@ -4,7 +4,7 @@ Draw a topic you didn't choose. Research it, write it in your own words, present
 
 Built by Matthew Sinitiere.
 
-**v2.0.0** — Next.js + Supabase. Optional accounts (username and password only), microphone recording, Whisper transcription, GPT grading A+ to F with filler-word counts and pointers. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
+**v2.0.0** — Next.js + Supabase. Optional accounts (email + username + password), microphone recording, Whisper transcription, GPT grading A+ to F with filler-word counts and pointers. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -21,8 +21,9 @@ Without `.env.local` the app still runs as a guest-only site: drawing, notes and
 ## Set up Supabase (once)
 
 1. Create a project at [supabase.com](https://supabase.com). Free tier is fine.
-2. **SQL Editor** → paste and run each file in `supabase/migrations/` in order (`0001_initial.sql`, then `0002_grading_model.sql`). It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, and two small functions (`username_taken`, `delete_own_account`).
-3. **Authentication → Providers → Email** → turn **off** "Confirm email". Usernames are stored as `username@impromptu.app`; that address doesn't exist, so confirmation can never complete.
+2. **SQL Editor** → paste and run each file in `supabase/migrations/` in order (`0001_initial.sql`, `0002_grading_model.sql`, `0003_email_auth.sql`). It creates `profiles`, `speeches`, `user_settings`, their row-level-security policies, three small functions (`username_taken`, `delete_own_account`, `handle_new_user`) and the trigger that creates a profile row for each new auth user.
+3. **Authentication → Sign In / Providers → Email** → leave **"Confirm email" on** (the default). Then **Authentication → URL Configuration**: set *Site URL* to your production URL and add these *Redirect URLs*: `https://<your-domain>/**`, `https://*-<your-vercel-team>.vercel.app/**` (previews), `http://localhost:3000/**`. Confirmation and reset links redirect to `/login?confirmed=1` and `/reset-password`; if a URL isn't on that list Supabase falls back to the Site URL.
+   The built-in email sender is rate-limited (a handful an hour) and often lands in spam. Fine for testing; add custom SMTP under **Authentication → SMTP** before real users.
 4. **Project Settings → API** → copy the Project URL and the anon / publishable key into `.env.local`:
 
 ```
@@ -42,17 +43,17 @@ Vercel, connected to this repository, builds on every push. Add the same two env
 src/app/                 routes (App Router). One folder per URL.
   layout.js              header, footer, toast, theme, store provider
   page.js                the app: hero, dial, topic card, workspace, recorder
-  login/ signup/ settings/ speeches/
+  login/ signup/ forgot-password/ reset-password/ settings/ speeches/
   how/ categories/ about/ mission/ privacy/ terms/ contact/
   globals.css            design tokens and every style; light/dark via [data-theme]
 src/components/          Header, Footer, Toast, Dial, TopicCard, Workspace, Library,
-                         HomeApp, AuthForm, SettingsPanel, SpeechHistory,
+                         HomeApp, AuthForm, PasswordForms, SettingsPanel, SpeechHistory,
                          AnalysisPanel, ApiKeyModal
 src/lib/
   topics.js              the corpus (RAW), CATS/FLAT, pick/pool/daily helpers
   store.js               React context: guest state in localStorage, signed-in
                          state mirrored to user_settings; auth actions
-  supabase.js            browser client; username <-> synthetic email
+  supabase.js            browser client (implicit flow so email links work cross-device)
   openai.js              Whisper + chat completions; the grading rubric
   utils.js               time formatting, Wikipedia lookup, chime, JSON download
 src/hooks/               useTimer, useRecorder
@@ -76,11 +77,13 @@ Cost is billed to the user's own key: roughly $0.006 for Whisper plus a fraction
 
 ## Auth model
 
-Supabase Auth needs an email-shaped identifier, so `username` becomes `username@impromptu.app`. The UI never mentions email. Consequences worth knowing:
+Email + password via Supabase Auth, with the email confirmed before first login. The username is the public handle and is passed as sign-up metadata; the `on_auth_user_created` trigger (`handle_new_user()`) turns it into a `profiles` row the moment the auth user exists, which is what lets the browser stay out of the loop until the email is confirmed.
 
-- No password reset. The signup form says so.
-- Username uniqueness is enforced twice: by `profiles.username unique` and, before signup, by the `username_taken()` function (security definer, so it works for anonymous callers).
+- Confirmation link → `/login?confirmed=1` with the session in the URL fragment (implicit flow), so it works in whatever browser the email is opened in; the page notices it is signed in and goes home.
+- **Forgot password** → `/forgot-password` sends a reset link → `/reset-password` sets the new one via `auth.updateUser`. Settings also has a change-password field.
+- Username uniqueness is enforced twice: by `profiles.username unique` and, before signup, by `username_taken()` (security definer, so it works for anonymous callers).
 - `delete_own_account()` deletes the `auth.users` row for the caller; everything else cascades. This is how the browser can delete an account without the service-role key.
+- Guest state is copied into `user_settings` on the first sign-in that finds no row.
 
 ## The topic corpus
 
@@ -100,7 +103,7 @@ Add a string to add a field; append to one to add topics. The category page, the
 ## Storage
 
 - Guest: one `localStorage` entry, `impromptu:v2` — theme, filters, history, saved, notes, checklist ticks, cached definitions.
-- Signed in: the same shape lands in `user_settings` (debounced), and `localStorage` mirrors it so the page paints before the round trip. Creating an account copies guest state across.
+- Signed in: the same shape lands in `user_settings` (debounced), and `localStorage` mirrors it so the page paints before the round trip. The first sign-in copies guest state across.
 - Speeches: `speeches` table only. Audio is discarded after transcription.
 
 ## Keyboard
@@ -118,7 +121,7 @@ Suppressed while typing in a field.
 ## Before going live
 
 - Set both env vars in Vercel.
-- Run both migrations and turn off email confirmation in Supabase.
+- Run all three migrations; set Site URL and Redirect URLs in Supabase; consider custom SMTP.
 - Contact email (`src/app/contact/page.js`) and governing law (`src/app/terms/page.js`, Texas) are set; change them if either moves.
 
 ## Licence

@@ -16,7 +16,7 @@ export default function Terms() {
       <p>Impromptu is a web application that suggests educational topics, displays a short reference definition, provides a notes area and a sixty-second timer, and — with an account and your own OpenAI API key — records a one-minute speech, transcribes it and produces an automated grade and feedback. It is a practice aid. It provides no instruction, certification, assessment of record, or professional advice of any kind.</p>
 
       <h2>3. Accounts</h2>
-      <p>An account is a username and a password. You are responsible for keeping the password safe; there is no email on file, so a lost password cannot be recovered, though you may create a new account. One person per account. Do not pick a username that impersonates someone else. Accounts that abuse the service or the third-party APIs it depends on may be removed.</p>
+      <p>An account is an email address you confirm, a public username and a password. You are responsible for keeping the password safe; it can be reset by email. One person per account. Do not pick a username that impersonates someone else. Accounts that abuse the service or the third-party APIs it depends on may be removed.</p>
 
       <h2>4. Your OpenAI key and costs</h2>
       <p>Grading uses OpenAI's APIs on a key you supply. All charges from that use are between you and OpenAI, under <a href="https://openai.com/policies/terms-of-use" target="_blank" rel="noopener">OpenAI's terms</a>. Impromptu does not mark up, meter or guarantee those costs. Keep the key scoped and revoke it at OpenAI if you stop using the service.</p>

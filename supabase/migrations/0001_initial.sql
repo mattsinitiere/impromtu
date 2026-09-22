@@ -1,9 +1,7 @@
 -- Impromptu v2 — initial schema
 -- Run in Supabase Dashboard → SQL Editor (project ztxfcgygrnvwymyzcgyb).
--- Also: Authentication → Providers → Email → turn OFF "Confirm email".
--- Then run 0002_grading_model.sql.
--- Usernames are stored as synthetic emails ({username}@impromptu.app) in auth.users;
--- the app never shows or collects a real email address.
+-- Then run 0002_grading_model.sql and 0003_email_auth.sql (which adds the
+-- profile-creating trigger and describes the Auth dashboard settings).
 
 -- ---------- profiles ----------
 create table if not exists public.profiles (

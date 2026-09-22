@@ -25,7 +25,7 @@ export default function Contact() {
       <p>Open an issue, or send a pull request adding it to the <code>RAW</code> array in <code>src/lib/topics.js</code>. The format is documented in the <a href="https://github.com/mattsinitiere/impromtu#the-topic-corpus" target="_blank" rel="noopener">README</a>.</p>
 
       <h2>Account problems</h2>
-      <p>There is no password reset, because there is no email on file. If you are locked out, create a new account. If you need something removed that you cannot remove yourself from <Link href="/settings">Settings</Link>, email with your username.</p>
+      <p>Forgot your password? Use <Link href="/forgot-password">the reset link</Link>. Confirmation or reset email not arriving? Check spam, then wait a minute and resend — the sender is rate-limited. If you need something removed that you cannot remove yourself from <Link href="/settings">Settings</Link>, email from the address on the account.</p>
 
       <h2>Email</h2>
       <p>For anything that does not belong in a public issue — press, partnerships, or a private question — write to <a href="mailto:matthewsinitiere7@gmail.com">matthewsinitiere7@gmail.com</a>.</p>

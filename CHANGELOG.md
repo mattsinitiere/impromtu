@@ -20,16 +20,19 @@ account and a graded speech recorder.
   attached.
 - **Speeches page.** Every graded take, grouped by topic with a
   take-by-take grade trend, re-record, delete, and the full report.
-- **Accounts.** Username + display name + password. No email or phone number.
-  Backed by Supabase Auth with a synthetic address, row-level security on
-  every table. Guest state carries into a new account.
+- **Accounts.** Email + username + display name + password, email confirmed
+  before first login, password reset by email, change password in Settings.
+  Backed by Supabase Auth; a database trigger creates the profile row; row-
+  level security on every table. Guest state carries into a new account on
+  first sign-in.
 - **Settings page.** OpenAI API key (asked for the first time you press
   Record; editable here), display name, theme, **Download my data** (one JSON
   file) and **Delete account** (immediate, cascading).
 - **Real URLs.** `/how`, `/categories`, `/about`, `/mission`, `/privacy`,
-  `/terms`, `/contact`, `/login`, `/signup`, `/settings`, `/speeches`.
+  `/terms`, `/contact`, `/login`, `/signup`, `/forgot-password`,
+  `/reset-password`, `/settings`, `/speeches`.
   Category tags and the speeches page deep-link back into the app.
-- `ROADMAP.md`, `supabase/migrations/0001_initial.sql`, `.env.local.example`.
+- `ROADMAP.md`, `supabase/migrations/` (three files), `.env.local.example`.
 
 ### Changed
 - Rewritten in Next.js 15 / React 19. Same design tokens, layout, dial,
